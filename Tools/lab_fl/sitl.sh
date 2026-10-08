@@ -3,7 +3,7 @@
 #
 #   sitl.sh start [sih|gz] [circle|paper]   start PX4 SITL and apply the vehicle calibration
 #                                           sih: SIH quadrotor, headless, in Docker (default)
-#                                           gz:  Gazebo x500 with the 3D window, on the host
+#                                           gz:  Gazebo x500 with the 3D window, on the host (spawned facing north)
 #                                           trajectory: circle (yaw constant, default) or paper
 #   sitl.sh demo lab|fl                     arm, take off and switch to the mode
 #   sitl.sh hold                            safe exit: back to Hold
@@ -79,6 +79,9 @@ start)
 		# read-write open of the FIFO: it never sees EOF when a writer closes.
 		# No arguments, as `make px4_sitl_default gz_x500` does: PX4 links its own etc directory into the working directory.
 		# setsid makes PX4 the leader of its process group, so `stop` can kill PX4 and the Gazebo processes it starts.
+		# The x500 of Gazebo spawns facing east (heading 90 deg). The LAB and FL laws assume the vehicle faces north, so spawn it
+		# facing north unless the caller sets PX4_GZ_MODEL_POSE ("x,y,z,roll,pitch,yaw" in the ENU world frame, yaw pi/2 = north).
+		export PX4_GZ_MODEL_POSE=${PX4_GZ_MODEL_POSE:-0,0,0.1,0,0,1.5708}
 		(cd "$RT"
 			GZ_IP=127.0.0.1 PX4_SIM_MODEL=gz_x500 setsid nohup "$GZBUILD/bin/px4" <> "$RT/cmd" > "$RT/px4.log" 2>&1 &
 			echo $! > "$RT/px4.pid")
