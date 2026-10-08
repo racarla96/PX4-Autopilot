@@ -1,0 +1,5 @@
+menuconfig MODULES_TRAJ_GENERATOR
+	bool "traj_generator"
+	default n
+	---help---
+		Enable support for traj_generator (reference trajectory for the LAB and FL flight modes)
