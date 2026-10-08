@@ -824,6 +824,8 @@ void Navigator::run()
 		case vehicle_status_s::NAVIGATION_STATE_ACRO:
 		case vehicle_status_s::NAVIGATION_STATE_ALTCTL:
 		case vehicle_status_s::NAVIGATION_STATE_ALTITUDE_CRUISE:
+		case vehicle_status_s::NAVIGATION_STATE_LAB:
+		case vehicle_status_s::NAVIGATION_STATE_FL:
 		case vehicle_status_s::NAVIGATION_STATE_POSCTL:
 		case vehicle_status_s::NAVIGATION_STATE_DESCEND:
 		case vehicle_status_s::NAVIGATION_STATE_TERMINATION:

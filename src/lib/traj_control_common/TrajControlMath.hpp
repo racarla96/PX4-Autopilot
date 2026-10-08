@@ -63,7 +63,7 @@ constexpr float kGravity = 9.81f;
 struct VehicleModel {
 	float mass{1.5f};                                   // [kg]
 	matrix::Vector3f inertia{0.02f, 0.02f, 0.04f};      // diagonal of the inertia matrix Ixx, Iyy, Izz [kg m^2]
-	matrix::Vector3f torque_max{2.f, 2.f, 0.2f};        // physical torque that corresponds to a normalized torque of 1 [N m]
+	matrix::Vector3f torque_max{3.3f, 3.3f, 0.47f};        // physical torque that corresponds to a normalized torque of 1 [N m]
 	float hover_thrust{0.5f};                           // normalized collective thrust that balances m*g
 };
 

@@ -72,6 +72,15 @@ void getVehicleControlMode(uint8_t nav_state, uint8_t vehicle_type,
 		vehicle_control_mode.flag_control_allocation_enabled = true;
 		break;
 
+	case vehicle_status_s::NAVIGATION_STATE_LAB:
+	case vehicle_status_s::NAVIGATION_STATE_FL:
+		// Trajectory-tracking modes: lab_control / fl_control publish vehicle_thrust_setpoint and
+		// vehicle_torque_setpoint themselves. Only the allocation stays enabled: with attitude and rates control
+		// disabled mc_att_control and mc_rate_control do not publish, and with position, velocity and altitude control
+		// disabled neither mc_pos_control nor the flight tasks publish a setpoint that would override ours.
+		vehicle_control_mode.flag_control_allocation_enabled = true;
+		break;
+
 	case vehicle_status_s::NAVIGATION_STATE_POSCTL:
 	case vehicle_status_s::NAVIGATION_STATE_POSITION_SLOW:
 		vehicle_control_mode.flag_control_manual_enabled = true;

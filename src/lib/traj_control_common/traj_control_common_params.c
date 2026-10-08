@@ -37,7 +37,8 @@
  * Parameters shared by the LAB and FL trajectory controllers.
  *
  * The model values below are REASONABLE DEFAULTS for a ~1.5 kg 450 mm quadrotor, NOT calibrated for the
- * lab drone. They must be replaced by the real mass, inertia and torque scale before flying (see the
+ * lab drone. For the SIH simulator (sihsim_quadx) use TCC_MASS 1.0, TCC_IXX 0.025, TCC_IYY 0.025, TCC_IZZ 0.03,
+ * TCC_TQ_MAX_XY 2.83 and TCC_TQ_MAX_Z 0.4. They must be replaced by the real mass, inertia and torque scale before flying (see the
  * calibration notes in the project README). Wrong values scale the control authority: inertia or torque
  * scale too high gives an aggressive, possibly unstable vehicle.
  */
@@ -90,7 +91,9 @@ PARAM_DEFINE_FLOAT(TCC_IZZ, 0.04f);
  * Roll / pitch torque at normalized torque 1
  *
  * Physical torque that the control allocator produces for a normalized roll or pitch torque setpoint of 1.
- * Roughly 4 * (arm length projected on the axis) * (half of the maximum rotor thrust).
+ * The allocator normalizes roll and pitch so that 1 moves every rotor output by 1/sqrt(2). For a quadrotor in X
+ * configuration with a linear thrust model: 4 * L * T_rotor_max / sqrt(2), with L the arm length projected on the
+ * roll / pitch axis and T_rotor_max the maximum thrust of one rotor. Default: 450 mm frame, 7.4 N per rotor.
  *
  * @unit Nm
  * @min 0.01
@@ -98,12 +101,14 @@ PARAM_DEFINE_FLOAT(TCC_IZZ, 0.04f);
  * @decimal 3
  * @group Trajectory Control
  */
-PARAM_DEFINE_FLOAT(TCC_TQ_MAX_XY, 2.0f);
+PARAM_DEFINE_FLOAT(TCC_TQ_MAX_XY, 3.3f);
 
 /**
  * Yaw torque at normalized torque 1
  *
- * Physical yaw torque that the control allocator produces for a normalized yaw torque setpoint of 1.
+ * Physical yaw torque that the control allocator produces for a normalized yaw torque setpoint of 1 (every rotor
+ * output moves by 1). For a quadrotor: 4 * Q_rotor_max, with Q_rotor_max the reaction torque of one rotor at full
+ * output. Default: 450 mm frame.
  *
  * @unit Nm
  * @min 0.001
@@ -111,7 +116,7 @@ PARAM_DEFINE_FLOAT(TCC_TQ_MAX_XY, 2.0f);
  * @decimal 3
  * @group Trajectory Control
  */
-PARAM_DEFINE_FLOAT(TCC_TQ_MAX_Z, 0.2f);
+PARAM_DEFINE_FLOAT(TCC_TQ_MAX_Z, 0.47f);
 
 /**
  * Minimum collective thrust

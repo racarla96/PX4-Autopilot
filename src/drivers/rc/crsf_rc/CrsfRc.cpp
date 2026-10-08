@@ -285,6 +285,14 @@ void CrsfRc::Run()
 						flight_mode = "Altitude Cruise";
 						break;
 
+					case vehicle_status_s::NAVIGATION_STATE_LAB:
+						flight_mode = "LAB";
+						break;
+
+					case vehicle_status_s::NAVIGATION_STATE_FL:
+						flight_mode = "FL";
+						break;
+
 					case vehicle_status_s::NAVIGATION_STATE_POSCTL:
 						flight_mode = "Position";
 						break;

@@ -76,6 +76,20 @@ void getModeRequirements(uint8_t vehicle_type, failsafe_flags_s &flags)
 	setRequirement(vehicle_status_s::NAVIGATION_STATE_ALTITUDE_CRUISE,
 		       flags.mode_req_manual_control); // COM_RCL_EXCEPT can override this
 
+	// NAVIGATION_STATE_LAB and NAVIGATION_STATE_FL: the controllers need the full state estimate (strict local position,
+	// not the relaxed one) and a manual control link, so that the safety pilot can always take over
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_LAB, flags.mode_req_angular_velocity);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_LAB, flags.mode_req_attitude);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_LAB, flags.mode_req_local_alt);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_LAB, flags.mode_req_local_position);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_LAB, flags.mode_req_manual_control);
+
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_FL, flags.mode_req_angular_velocity);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_FL, flags.mode_req_attitude);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_FL, flags.mode_req_local_alt);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_FL, flags.mode_req_local_position);
+	setRequirement(vehicle_status_s::NAVIGATION_STATE_FL, flags.mode_req_manual_control);
+
 	// NAVIGATION_STATE_POSCTL
 	setRequirement(vehicle_status_s::NAVIGATION_STATE_POSCTL, flags.mode_req_angular_velocity);
 	setRequirement(vehicle_status_s::NAVIGATION_STATE_POSCTL, flags.mode_req_attitude);
