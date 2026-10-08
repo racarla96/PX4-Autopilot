@@ -29,13 +29,21 @@ GZBUILD=$ROOT/build/px4_sitl_default_gz
 
 send() { echo "$*" > "$RT/cmd"; }
 
-wait_boot() {
-	for _ in $(seq 1 180); do
+wait_startup() {
+	for _ in $(seq 1 240); do
+		grep -q "Startup script returned successfully" "$RT/px4.log" 2>/dev/null && return 0
+		sleep 1
+	done
+	echo "PX4 did not finish its startup script in 240 s, see $RT/px4.log" >&2
+	return 1
+}
+
+wait_ready() {
+	for _ in $(seq 1 90); do
 		grep -q "Ready for takeoff" "$RT/px4.log" 2>/dev/null && return 0
 		sleep 1
 	done
-	echo "PX4 did not report 'Ready for takeoff' in 180 s, see $RT/px4.log" >&2
-	return 1
+	echo "warning: PX4 did not report 'Ready for takeoff' in 90 s (see $RT/px4.log), continuing" >&2
 }
 
 stop_all() {
@@ -52,7 +60,8 @@ calibration() {
 	gz) set -- "TCC_MASS 2.06" "TCC_IXX 0.0236" "TCC_IYY 0.0236" "TCC_IZZ 0.0439" "TCC_TQ_MAX_XY 3.14" "TCC_TQ_MAX_Z 0.52" ;;
 	*) set -- "TCC_MASS 1.0" "TCC_IXX 0.025" "TCC_IYY 0.025" "TCC_IZZ 0.03" "TCC_TQ_MAX_XY 2.83" "TCC_TQ_MAX_Z 0.4" ;;
 	esac
-	for p in "$@"; do send "param set $p"; done
+	# no data link loss action: the preflight checks must not depend on a ground station being connected
+	for p in "$@" "NAV_DLL_ACT 0"; do send "param set $p"; done
 }
 
 case "${1:-}" in
@@ -67,10 +76,11 @@ start)
 		rm -f "$RT/cmd" "$RT/px4.log"
 		mkfifo "$RT/cmd"
 		ln -sf "$GZBUILD/rootfs/gz_env.sh" "$RT/gz_env.sh"
-		# read-write open of the FIFO: it never sees EOF when a writer closes
-		# no arguments, as `make px4_sitl_default gz_x500` does: PX4 links its own etc directory into the working directory
-		(cd "$RT" && GZ_IP=127.0.0.1 PX4_SIM_MODEL=gz_x500 setsid nohup "$GZBUILD/bin/px4" \
-			<> "$RT/cmd" > "$RT/px4.log" 2>&1 &
+		# read-write open of the FIFO: it never sees EOF when a writer closes.
+		# No arguments, as `make px4_sitl_default gz_x500` does: PX4 links its own etc directory into the working directory.
+		# setsid makes PX4 the leader of its process group, so `stop` can kill PX4 and the Gazebo processes it starts.
+		(cd "$RT"
+			GZ_IP=127.0.0.1 PX4_SIM_MODEL=gz_x500 setsid nohup "$GZBUILD/bin/px4" <> "$RT/cmd" > "$RT/px4.log" 2>&1 &
 			echo $! > "$RT/px4.pid")
 		if [ "${JOYSTICK:-1}" = "1" ]; then
 			docker run -d --rm --name "$JOY" --network host -v "$ROOT/Tools/lab_fl":/harness "$IMAGE" python3 /harness/mc_send.py >/dev/null
@@ -82,13 +92,14 @@ start)
 			-e HOME=/tmp -e PX4_SYS_AUTOSTART=10040 -e PX4_SIM_MODEL=sihsim_quadx -e JOYSTICK="${JOYSTICK:-1}" \
 			"$IMAGE" /harness/container_run.sh >/dev/null
 	fi
-	echo "waiting for PX4 to boot ($backend)..."
-	wait_boot
+	echo "waiting for PX4 to boot ($backend), this takes up to a couple of minutes..."
+	wait_startup
 	calibration "$backend"
 	case "$traj" in
 	paper) send "param set TRJ_TYPE 3" ;;
 	*) send "param set TRJ_TYPE 1"; send "param set TRJ_DURATION 60" ;;
 	esac
+	wait_ready
 	echo "PX4 SITL ($backend) is running (trajectory: $traj). Open QGroundControl, then: $0 demo lab"
 	;;
 demo)
