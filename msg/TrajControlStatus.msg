@@ -24,5 +24,6 @@ float32 thrust			# normalized collective thrust output [0,1]
 float32[4] q_d			# desired attitude quaternion sent to the attitude controller
 
 bool thrust_saturated		# thrust limited by min/max
+bool torque_saturated		# angular acceleration or normalized torque limited
 bool tilt_saturated		# tilt angle limited by the configured maximum
 uint32 saturation_count		# number of cycles with any saturation since the mode was entered
