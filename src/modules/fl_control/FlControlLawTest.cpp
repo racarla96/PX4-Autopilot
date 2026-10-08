@@ -136,7 +136,8 @@ TEST(FlControlLaw, ClosedLoopMatchesSimulinkModel)
 
 	const float M = 1.f;
 	const float Ts = static_cast<float>(kTs);
-	const Gains gains; // first trajectory
+	Gains gains; // first trajectory
+	gains.model_derivatives = false; // the paper's filtered derivatives, as in the Simulink model
 	FlControlLaw law;
 	law.reset(M * static_cast<float>(kG));
 
@@ -304,4 +305,125 @@ TEST(FlControlLaw, ThrustStateIsLimited)
 	law.reset(-1.f);
 	law.limitThrust(2.f, 20.f);
 	EXPECT_FLOAT_EQ(law.thrust(), 2.f);
+}
+
+TEST(FlControlLaw, ModelAccelerationAndJerkMatchThePlant)
+{
+	const double M = 1.7;
+	const auto u = [](double t) { return 12. + 2. * sin(0.8 * t); };
+	const auto phi = [](double t) { return 0.2 * sin(0.9 * t); };
+	const auto theta = [](double t) { return 0.15 * cos(0.7 * t); };
+	const auto acc = [&](double t, int axis) {
+		const double uu = u(t), sp = sin(phi(t)), cp = cos(phi(t)), st = sin(theta(t)), ct = cos(theta(t));
+		return axis == 0 ? -uu * st / M : (axis == 1 ? uu * ct * sp / M : uu * ct * cp / M - kG);
+	};
+
+	for (double t = 0.3; t < 8.; t += 0.61) {
+		const double h = 1e-4;
+		const float euler[3] = {static_cast<float>(phi(t)), static_cast<float>(theta(t)), 0.f};
+		const float rate[3] = {static_cast<float>(0.18 * cos(0.9 * t)), static_cast<float>(-0.105 * sin(0.7 * t)), 0.f};
+		float a[3], j[3];
+		modelAccelerationAndJerk(static_cast<float>(M), static_cast<float>(kG), static_cast<float>(u(t)),
+					 static_cast<float>(1.6 * cos(0.8 * t)), euler, rate, a, j);
+
+		for (int axis = 0; axis < 3; axis++) {
+			EXPECT_NEAR(static_cast<double>(a[axis]), acc(t, axis), 2e-4) << "t=" << t << " axis=" << axis;
+			EXPECT_NEAR(static_cast<double>(j[axis]), (acc(t + h, axis) - acc(t - h, axis)) / (2. * h), 2e-3)
+					<< "t=" << t << " axis=" << axis;
+		}
+	}
+}
+
+namespace
+{
+
+struct LagRun {
+	bool stable;
+	double max_tilt_deg;
+	double rms_error;
+};
+
+// FL on a plant with first-order actuator lag (thrust and angular accelerations) tracking a circle, 60 s, hover start.
+LagRun runWithActuatorLag(bool model_derivatives, double lag)
+{
+	const double M = 1.0, R = 1., w = 0.63, dt = 0.002, T = 60.;
+	Gains gains;
+	gains.model_derivatives = model_derivatives;
+	FlControlLaw law;
+	law.reset(static_cast<float>(M * kG));
+	double X[12] = {};
+	double u_act = M * kG, a_act[3] = {0., 0., 0.};
+	Output out;
+	LagRun result{true, 0., 0.};
+	double sum_sq = 0.;
+	int count = 0;
+
+	for (int k = 0; k < static_cast<int>(T / dt); k++) {
+		const double t = k * dt;
+
+		if (k % 10 == 0) { // controller at Ts = 0.02 s
+			Reference ref;
+			ref.position[0] = static_cast<float>(R * (cos(w * t) - 1.));
+			ref.position[1] = static_cast<float>(R * sin(w * t));
+			ref.velocity[0] = static_cast<float>(-R * w * sin(w * t));
+			ref.velocity[1] = static_cast<float>(R * w * cos(w * t));
+			out = law.step(gains, static_cast<float>(M), 0.02f, 0.01f, toState(X), ref);
+			law.limitThrust(static_cast<float>(0.15 * M * kG), static_cast<float>(2. * M * kG));
+		}
+
+		const double cmd[4] = {sat(static_cast<double>(out.thrust), 0.15 * M * kG, 2. * M * kG),
+				       sat(static_cast<double>(out.euler_accel[0]), -10., 10.),
+				       sat(static_cast<double>(out.euler_accel[1]), -10., 10.), sat(static_cast<double>(out.euler_accel[2]), -1., 1.)
+				      };
+		const double al = dt / (lag + dt);
+		u_act += al * (cmd[0] - u_act);
+
+		for (int i = 0; i < 3; i++) { a_act[i] += al * (cmd[i + 1] - a_act[i]); }
+
+		const auto f = [&](const double *s, double *d) {
+			d[0] = s[1]; d[1] = -u_act * sin(s[8]) / M;
+			d[2] = s[3]; d[3] = u_act * cos(s[8]) * sin(s[6]) / M;
+			d[4] = s[5]; d[5] = u_act * cos(s[8]) * cos(s[6]) / M - kG;
+			d[6] = s[7]; d[7] = a_act[0]; d[8] = s[9]; d[9] = a_act[1]; d[10] = s[11]; d[11] = a_act[2];
+		};
+		double k1[12], k2[12], tmp[12];
+		f(X, k1);
+
+		for (int i = 0; i < 12; i++) { tmp[i] = X[i] + dt * k1[i]; }
+
+		f(tmp, k2);
+
+		for (int i = 0; i < 12; i++) { X[i] += 0.5 * dt * (k1[i] + k2[i]); }
+
+		if (fabs(X[6]) > 1.5 || fabs(X[8]) > 1.5) {
+			result.stable = false;
+			return result;
+		}
+
+		const double tilt = acos(fmin(1., cos(X[6]) * cos(X[8]))) * 180. / M_PI;
+		result.max_tilt_deg = fmax(result.max_tilt_deg, tilt);
+
+		if (t > 15.) {
+			const double ex = X[0] - R * (cos(w * t) - 1.), ey = X[2] - R * sin(w * t);
+			sum_sq += ex * ex + ey * ey;
+			count++;
+		}
+	}
+
+	result.rms_error = sqrt(sum_sq / count);
+	return result;
+}
+
+} // namespace
+
+TEST(FlControlLaw, ModelDerivativesAreRobustToActuatorLag)
+{
+	// 100 ms of actuator lag: the paper's filtered derivatives diverge, the model-based ones keep tracking
+	const LagRun model = runWithActuatorLag(true, 0.1);
+	EXPECT_TRUE(model.stable);
+	EXPECT_LT(model.max_tilt_deg, 25.);
+	EXPECT_LT(model.rms_error, 1.5);
+
+	const LagRun paper = runWithActuatorLag(false, 0.1);
+	EXPECT_FALSE(paper.stable);
 }

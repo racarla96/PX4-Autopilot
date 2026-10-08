@@ -111,6 +111,7 @@ void LabControl::Run()
 	const hrt_abstime now = hrt_absolute_time();
 
 	if (!_was_active) {
+		_common.latchHoverThrust();
 		_common.resetSaturationCount();
 		_was_active = true;
 	}
@@ -188,7 +189,8 @@ int LabControl::custom_command(int argc, char *argv[])
 
 int LabControl::print_status()
 {
-	PX4_INFO("nav_state: %d, active: %d, Ts: %.3f s", _nav_state, _was_active, (double)_common.samplePeriod());
+	PX4_INFO("nav_state: %d, active: %d, Ts: %.3f s, hover thrust: %.3f", _nav_state, _was_active,
+		 (double)_common.samplePeriod(), (double)_common.model().hover_thrust);
 
 	if (_last_input_failure != 0) {
 		PX4_INFO("last input failure (missing, stale or invalid state/reference): %.1f s ago",

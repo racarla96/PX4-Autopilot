@@ -48,6 +48,7 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/hover_thrust_estimate.h>
 #include <uORB/topics/traj_control_status.h>
 #include <uORB/topics/trajectory_reference.h>
 #include <uORB/topics/vehicle_local_position.h>
@@ -89,6 +90,13 @@ public:
 	void updateParams() override;
 
 	const VehicleModel &model() const { return _model; }
+
+	/**
+	 * Latch the hover thrust for this run of the mode: the live estimate of mc_hover_thrust_estimator (converged while
+	 * the vehicle was flying in Position or Hold before entering) if valid, otherwise MPC_THR_HOVER. It is not updated
+	 * while the mode is active, so the estimator cannot interact with the controller. Call on every entry into the mode.
+	 */
+	void latchHoverThrust();
 	const Limits &limits() const { return _limits; }
 
 	/** Controller sample time Ts [s] (TCC_TS). Both controllers run at the same rate. */
@@ -133,7 +141,10 @@ private:
 	VehicleModel _model{};
 	Limits _limits{};
 	uint32_t _saturation_count{0};
+	bool _hover_latched{false};
+	float _hover_thrust_latched{0.5f};
 
+	uORB::Subscription _hover_thrust_estimate_sub{ORB_ID(hover_thrust_estimate)};
 	uORB::Subscription _local_position_sub{ORB_ID(vehicle_local_position)};
 	uORB::Subscription _attitude_sub{ORB_ID(vehicle_attitude)};
 	uORB::Subscription _angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};

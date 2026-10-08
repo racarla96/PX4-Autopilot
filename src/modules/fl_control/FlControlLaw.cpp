@@ -92,6 +92,26 @@ void decouplingMatrix(float mass, float u, const float euler[3], float G[4][4])
 	}
 }
 
+void modelAccelerationAndJerk(float mass, float gravity, float u, float u_dot, const float euler[3], const float euler_rate[3],
+			      float accel[3], float jerk[3])
+{
+	const float sphi = sinf(euler[0]);
+	const float cphi = cosf(euler[0]);
+	const float stheta = sinf(euler[1]);
+	const float ctheta = cosf(euler[1]);
+	const float phid = euler_rate[0];
+	const float thetad = euler_rate[1];
+	const float im = 1.f / mass;
+
+	accel[0] = -u * stheta * im;
+	accel[1] = u * ctheta * sphi * im;
+	accel[2] = u * ctheta * cphi * im - gravity;
+
+	jerk[0] = -(u_dot * stheta + u * ctheta * thetad) * im;
+	jerk[1] = (u_dot * ctheta * sphi - u * stheta * thetad * sphi + u * ctheta * cphi * phid) * im;
+	jerk[2] = (u_dot * ctheta * cphi - u * stheta * thetad * cphi - u * ctheta * sphi * phid) * im;
+}
+
 void driftTerms(float mass, float u, float u_dot, const float euler[3], const float euler_rate[3], bool exact_fz,
 		float f[3])
 {
@@ -135,10 +155,26 @@ Output FlControlLaw::step(const Gains &gains, float mass, float Ts, float tau_fi
 
 	// Linear controllers: error + velocity error - estimated acceleration - estimated jerk
 	float v[4];
+	float model_accel[3];
+	float model_jerk[3];
+
+	if (gains.model_derivatives) {
+		modelAccelerationAndJerk(mass, kGravity, _u, _u_dot, state.euler, state.euler_rate, model_accel, model_jerk);
+	}
 
 	for (int i = 0; i < 3; i++) {
-		const float accel = _accel[i].step(state.velocity[i], Ts, tau_filter);
-		const float jerk = _jerk[i].step(accel, Ts, tau_filter);
+		float accel;
+		float jerk;
+
+		if (gains.model_derivatives) {
+			accel = model_accel[i];
+			jerk = model_jerk[i];
+
+		} else {
+			accel = _accel[i].step(state.velocity[i], Ts, tau_filter);
+			jerk = _jerk[i].step(accel, Ts, tau_filter);
+		}
+
 		v[i] = gains.k[i][0] * (ref.position[i] - state.position[i]) + gains.k[i][1] * (ref.velocity[i] - state.velocity[i])
 		       - gains.k[i][2] * accel - gains.k[i][3] * jerk;
 	}

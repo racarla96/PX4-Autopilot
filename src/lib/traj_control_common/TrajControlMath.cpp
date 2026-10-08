@@ -189,6 +189,18 @@ Vector3f extrapolate(const Vector3f &position, const Vector3f &velocity, const V
 	return position + velocity * dt + acceleration * (0.5f * dt * dt) + jerk * (dt * dt * dt / 6.f);
 }
 
+float selectHoverThrust(float estimate, bool estimate_valid, float param_value)
+{
+	constexpr float kMin = 0.15f;
+	constexpr float kMax = 0.85f;
+
+	if (estimate_valid && PX4_ISFINITE(estimate) && estimate >= kMin && estimate <= kMax) {
+		return estimate;
+	}
+
+	return param_value;
+}
+
 bool isFresh(uint64_t now_us, uint64_t timestamp_us, uint64_t timeout_us)
 {
 	return timestamp_us != 0 && now_us >= timestamp_us && (now_us - timestamp_us) <= timeout_us;

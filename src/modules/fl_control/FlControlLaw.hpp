@@ -52,12 +52,21 @@
  *  - the derivative filter has a time constant of max(T, 10 Ts), not T;
  *  - the paper's fz drift term does not match the exact derivative of m z_ddot = u cos(theta) cos(phi) - m g in its
  *    u_dot terms (Gains::exact_fz selects the exact one). The effect is small because u_dot is small.
+ *
+ * Robustness (Gains::model_derivatives): the paper estimates the acceleration and the jerk of the vehicle by filtering the
+ * measured velocity, with a 0.2 s time constant. That lag is harmless on the ideal plant of the study but destabilizes the
+ * loop on a real vehicle (simulations with actuator lag, and flights in Gazebo, diverge), more so the more damped the poles
+ * are. With model_derivatives the acceleration and the jerk come from the plant model itself (exact in terms of u, u_dot,
+ * the Euler angles and their rates), which removes the lag. It is the default; the paper's version is kept for validation.
  */
 
 #pragma once
 
 namespace fl_control
 {
+
+/** Gravity of the paper's model [m/s^2]. */
+constexpr float kGravity = 9.81f;
 
 /**
  * Pole placement gains. Row i is [k_i1 k_i2 k_i3 k_i4] of channel x, y, z; k4 is [k_41, k_42] of the yaw channel.
@@ -69,6 +78,7 @@ struct Gains {
 		{1.6698f, 3.509f, 2.59f, 2.9f}};
 	float k_yaw[2] {0.5f, 1.5f};
 	bool exact_fz{false};  // false: fz exactly as in the paper's Simulink model, true: exact derivative
+	bool model_derivatives{true};  // true: acceleration and jerk from the model, false: filtered velocity as in the paper
 };
 
 struct State {
@@ -112,6 +122,10 @@ private:
 
 /** Decoupling matrix G (4x4, row-major) for the inputs [u_ddot, tau_phi, tau_theta, tau_psi]. Exposed for testing. */
 void decouplingMatrix(float mass, float u, const float euler[3], float G[4][4]);
+
+/** Acceleration and jerk of x, y, z (paper frame) predicted by the model. Exposed for testing. */
+void modelAccelerationAndJerk(float mass, float gravity, float u, float u_dot, const float euler[3], const float euler_rate[3],
+			      float accel[3], float jerk[3]);
 
 /** Drift terms f of the fourth derivative of x, y, z (see Gains::exact_fz). Exposed for testing. */
 void driftTerms(float mass, float u, float u_dot, const float euler[3], const float euler_rate[3], bool exact_fz,

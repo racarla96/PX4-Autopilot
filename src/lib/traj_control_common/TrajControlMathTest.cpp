@@ -248,6 +248,15 @@ TEST(TrajControlMath, LimitAbs)
 	EXPECT_FLOAT_EQ(v, 0.f);
 }
 
+TEST(TrajControlMath, SelectHoverThrust)
+{
+	EXPECT_FLOAT_EQ(selectHoverThrust(0.73f, true, 0.6f), 0.73f);   // valid estimate wins
+	EXPECT_FLOAT_EQ(selectHoverThrust(0.73f, false, 0.6f), 0.6f);   // not valid: parameter
+	EXPECT_FLOAT_EQ(selectHoverThrust(NAN, true, 0.6f), 0.6f);      // not finite
+	EXPECT_FLOAT_EQ(selectHoverThrust(0.05f, true, 0.6f), 0.6f);    // implausible (too low)
+	EXPECT_FLOAT_EQ(selectHoverThrust(0.95f, true, 0.6f), 0.6f);    // implausible (too high)
+}
+
 TEST(TrajControlMath, IsFresh)
 {
 	EXPECT_TRUE(isFresh(1000000, 900000, 200000));

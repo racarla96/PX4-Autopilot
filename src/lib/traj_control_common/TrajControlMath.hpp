@@ -121,6 +121,13 @@ Setpoints toSetpoints(const VehicleModel &model, const Limits &limits, const mat
 matrix::Vector3f extrapolate(const matrix::Vector3f &position, const matrix::Vector3f &velocity,
 			     const matrix::Vector3f &acceleration, const matrix::Vector3f &jerk, float dt);
 
+/**
+ * Hover thrust to use: the live estimate of mc_hover_thrust_estimator if it is valid and plausible, otherwise the
+ * parameter. The real hover thrust depends on the vehicle and its thrust curve (the x500 of Gazebo hovers at 0.73
+ * with a parameter of 0.60), and a wrong value makes the controllers hold altitude with a permanent offset.
+ */
+float selectHoverThrust(float estimate, bool estimate_valid, float param_value);
+
 /** True if a message with this timestamp is not older than the timeout. A zero timestamp is never fresh. */
 bool isFresh(uint64_t now_us, uint64_t timestamp_us, uint64_t timeout_us);
 

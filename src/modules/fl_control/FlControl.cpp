@@ -83,6 +83,7 @@ fl_control::Gains FlControl::gains() const
 	g.k_yaw[0] = _param_k41.get();
 	g.k_yaw[1] = _param_k42.get();
 	g.exact_fz = _param_exact_fz.get() != 0;
+	g.model_derivatives = _param_model_deriv.get() != 0;
 	return g;
 }
 
@@ -119,6 +120,7 @@ void FlControl::Run()
 	const float weight = _common.model().mass * traj_control::kGravity;
 
 	if (!_was_active) {
+		_common.latchHoverThrust();
 		// Entering FL: the thrust integrator starts at hover (u = m g, u_dot = 0), like the paper's initial condition
 		_law.reset(weight);
 		_common.resetSaturationCount();
@@ -203,9 +205,9 @@ int FlControl::custom_command(int argc, char *argv[])
 
 int FlControl::print_status()
 {
-	PX4_INFO("nav_state: %d, active: %d, Ts: %.3f s, thrust state u: %.2f N, u_dot: %.2f N/s, singular steps: %u",
-		 _nav_state, _was_active, (double)_common.samplePeriod(), (double)_law.thrust(), (double)_law.thrustRate(),
-		 static_cast<unsigned>(_singular_count));
+	PX4_INFO("nav_state: %d, active: %d, Ts: %.3f s, hover thrust: %.3f, thrust state u: %.2f N, u_dot: %.2f N/s, singular steps: %u",
+		 _nav_state, _was_active, (double)_common.samplePeriod(), (double)_common.model().hover_thrust,
+		 (double)_law.thrust(), (double)_law.thrustRate(), static_cast<unsigned>(_singular_count));
 
 	if (_last_input_failure != 0) {
 		PX4_INFO("last input failure (missing, stale or invalid state/reference): %.1f s ago",

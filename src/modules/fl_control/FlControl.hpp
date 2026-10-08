@@ -108,6 +108,7 @@ private:
 		(ParamFloat<px4::params::FL_K41>) _param_k41,
 		(ParamFloat<px4::params::FL_K42>) _param_k42,
 		(ParamFloat<px4::params::FL_TAU>) _param_tau,
-		(ParamInt<px4::params::FL_EXACT_FZ>) _param_exact_fz
+		(ParamInt<px4::params::FL_EXACT_FZ>) _param_exact_fz,
+		(ParamInt<px4::params::FL_MODEL_DERIV>) _param_model_deriv
 	)
 };

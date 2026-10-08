@@ -56,12 +56,23 @@ void TrajControlCommon::updateParams()
 	_model.mass = _param_tcc_mass.get();
 	_model.inertia = matrix::Vector3f(_param_tcc_ixx.get(), _param_tcc_iyy.get(), _param_tcc_izz.get());
 	_model.torque_max = matrix::Vector3f(_param_tcc_tq_max_xy.get(), _param_tcc_tq_max_xy.get(), _param_tcc_tq_max_z.get());
-	_model.hover_thrust = _param_mpc_thr_hover.get();
+	_model.hover_thrust = _hover_latched ? _hover_thrust_latched : _param_mpc_thr_hover.get();
 
 	_limits.thrust_min = _param_tcc_thr_min.get();
 	_limits.thrust_max = math::max(_param_tcc_thr_max.get(), _param_tcc_thr_min.get());
 	_limits.alpha_max = matrix::Vector3f(_param_tcc_alpha_xy.get(), _param_tcc_alpha_xy.get(), _param_tcc_alpha_z.get());
 	_limits.tilt_max = math::radians(_param_tcc_tilt_max.get());
+}
+
+void TrajControlCommon::latchHoverThrust()
+{
+	hover_thrust_estimate_s estimate{};
+	const bool have = _hover_thrust_estimate_sub.copy(&estimate);
+
+	_hover_thrust_latched = selectHoverThrust(have ? estimate.hover_thrust : NAN, have && estimate.valid,
+				_param_mpc_thr_hover.get());
+	_hover_latched = true;
+	_model.hover_thrust = _hover_thrust_latched;
 }
 
 bool TrajControlCommon::readInputs(hrt_abstime now, Inputs &in)
