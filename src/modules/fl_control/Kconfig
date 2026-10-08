@@ -1,0 +1,5 @@
+menuconfig MODULES_FL_CONTROL
+	bool "fl_control"
+	default n
+	---help---
+		Enable support for fl_control (FL trajectory-tracking flight mode)

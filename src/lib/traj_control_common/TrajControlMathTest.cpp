@@ -248,30 +248,6 @@ TEST(TrajControlMath, LimitAbs)
 	EXPECT_FLOAT_EQ(v, 0.f);
 }
 
-TEST(TrajControlMath, SampleClockRunsOncePerPeriod)
-{
-	SampleClock clock(20000);
-	int count = 0;
-
-	// 1 kHz polling for 1 second -> 50 samples (+ the first immediate one)
-	for (uint64_t t = 0; t <= 1000000; t += 1000) {
-		count += clock.due(t) ? 1 : 0;
-	}
-
-	EXPECT_NEAR(count, 51, 1);
-}
-
-TEST(TrajControlMath, SampleClockDoesNotBurstAfterOverrun)
-{
-	SampleClock clock(20000);
-	EXPECT_TRUE(clock.due(0));
-	EXPECT_FALSE(clock.due(10000));
-	EXPECT_TRUE(clock.due(200000)); // 10 periods late: runs once
-	EXPECT_FALSE(clock.due(200001));
-	EXPECT_FALSE(clock.due(210000));
-	EXPECT_TRUE(clock.due(220000));
-}
-
 TEST(TrajControlMath, IsFresh)
 {
 	EXPECT_TRUE(isFresh(1000000, 900000, 200000));
@@ -279,4 +255,18 @@ TEST(TrajControlMath, IsFresh)
 	EXPECT_FALSE(isFresh(1000000, 700000, 200000));
 	EXPECT_FALSE(isFresh(1000000, 0, 200000));       // never published
 	EXPECT_FALSE(isFresh(1000000, 1000001, 200000)); // timestamp in the future
+}
+
+TEST(TrajControlMath, ExtrapolateMatchesPolynomial)
+{
+	// p(t) = 1 + 2t + 3t^2 + 4t^3  ->  v = 2 + 6t + 12t^2, a = 6 + 24t, j = 24 at t = 0.5
+	const float t = 0.5f;
+	const float dt = 0.02f;
+	const auto P = [](float x) { return 1.f + 2.f * x + 3.f * x * x + 4.f * x * x * x; };
+	const Vector3f p(P(t), 2.f * P(t), -P(t));
+	const Vector3f v(2.f + 6.f * t + 12.f * t * t, 0.f, 0.f);
+	const Vector3f a(6.f + 24.f * t, 0.f, 0.f);
+	const Vector3f j(24.f, 0.f, 0.f);
+	const Vector3f next = extrapolate(p, v, a, j, dt);
+	EXPECT_NEAR(next(0), P(t + dt), 1e-5f); // cubic polynomial: exact
 }

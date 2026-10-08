@@ -39,7 +39,8 @@
  * so it can be unit tested on the host.
  *
  * All quantities are relative to the vehicle state captured at the start of the
- * trajectory (local NED frame). The path always starts at the start position with
+ * trajectory (local NED frame). TrajectoryType::Paper is the reference of the LAB vs FL paper
+ * (see evaluatePaper) and ignores the other fields of ProfileParams. The path always starts at the start position with
  * zero velocity (smooth speed ramp-up) and, if a duration is set, ends at rest
  * (smooth speed ramp-down).
  */
@@ -53,6 +54,7 @@ enum class TrajectoryType : int {
 	Hover = 0,
 	Circle = 1,
 	Figure8 = 2,
+	Paper = 3,
 };
 
 struct ProfileParams {
@@ -81,6 +83,19 @@ struct ProfileReference {
 	float yaw_rate{0.f};
 	bool finished{false};
 };
+
+/** Constants of the paper's reference trajectory (first trajectory of the LAB vs FL study, Ts = 0.02 s). */
+constexpr float kPaperRadius = 2.f;       // circle radius [m]
+constexpr float kPaperOmega = 0.3f;       // angular rate of the circle and of the yaw reference [rad/s]
+constexpr float kPaperClimbRate = 0.05f;  // climb rate during the circle [m/s]
+constexpr float kPaperLegTime = 40.f;     // duration of each of the two legs [s]
+
+/**
+ * The paper's reference, relative to the start state. Leg 1 (40 s): circle of radius 2 m at 0.3 rad/s, climbing
+ * 0.05 m/s, with the yaw reference turning at 0.3 rad/s. Leg 2 (40 s): hold x, y and yaw while descending back to
+ * the start altitude. It has no ramp: the velocity steps at t = 0 and at t = 40 s, exactly as in the paper.
+ */
+ProfileReference evaluatePaper(const ProfileStart &start, float t);
 
 /**
  * Evaluate the reference at time t (seconds since the start of the trajectory).

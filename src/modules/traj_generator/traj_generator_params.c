@@ -45,9 +45,10 @@
  * @value 0 Hover (hold the start point)
  * @value 1 Circle
  * @value 2 Figure-8
+ * @value 3 Paper (LAB vs FL study: 2 m circle at 0.3 rad/s, 2 m climb, 2 m descent, 80 s; ignores the other TRJ_* parameters)
  * @group Trajectory Generator
  */
-PARAM_DEFINE_INT32(TRJ_TYPE, 1);
+PARAM_DEFINE_INT32(TRJ_TYPE, 3);
 
 /**
  * Trajectory amplitude

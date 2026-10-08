@@ -36,7 +36,7 @@
  *
  * Pure math shared by the LAB and FL trajectory controllers: frame conversion, Euler kinematics,
  * conversion of the paper's control inputs into PX4 normalized thrust / torque setpoints,
- * saturations and sample timing. No uORB or parameter dependencies, so it is unit tested on the host.
+ * saturations and timeouts. No uORB or parameter dependencies, so it is unit tested on the host.
  *
  * Conventions
  * -----------
@@ -117,26 +117,9 @@ bool limitAbs(float &value, float limit);
 Setpoints toSetpoints(const VehicleModel &model, const Limits &limits, const matrix::Vector3f &euler,
 		      const matrix::Vector3f &euler_rate, const Command &command);
 
-/**
- * Fixed rate gate: due() is true once per period. The controllers hold their last output between
- * samples (zero order hold), as the discrete laws of the paper assume. After an overrun it does not burst.
- */
-class SampleClock
-{
-public:
-	explicit SampleClock(uint64_t period_us = 20000) : _period_us(period_us) {}
-
-	void setPeriod(uint64_t period_us) { _period_us = period_us; }
-	uint64_t period() const { return _period_us; }
-	void reset() { _initialized = false; }
-
-	bool due(uint64_t now_us);
-
-private:
-	uint64_t _period_us;
-	uint64_t _next_us{0};
-	bool _initialized{false};
-};
+/** Position dt seconds ahead from the third order Taylor expansion with velocity, acceleration and jerk. */
+matrix::Vector3f extrapolate(const matrix::Vector3f &position, const matrix::Vector3f &velocity,
+			     const matrix::Vector3f &acceleration, const matrix::Vector3f &jerk, float dt);
 
 /** True if a message with this timestamp is not older than the timeout. A zero timestamp is never fresh. */
 bool isFresh(uint64_t now_us, uint64_t timestamp_us, uint64_t timeout_us);

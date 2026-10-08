@@ -183,26 +183,10 @@ Setpoints toSetpoints(const VehicleModel &model, const Limits &limits, const Vec
 	return out;
 }
 
-bool SampleClock::due(uint64_t now_us)
+Vector3f extrapolate(const Vector3f &position, const Vector3f &velocity, const Vector3f &acceleration,
+		     const Vector3f &jerk, float dt)
 {
-	if (!_initialized) {
-		_initialized = true;
-		_next_us = now_us + _period_us;
-		return true;
-	}
-
-	if (now_us < _next_us) {
-		return false;
-	}
-
-	_next_us += _period_us;
-
-	if (now_us >= _next_us) {
-		// overrun of more than one period: resynchronize instead of running a burst of samples
-		_next_us = now_us + _period_us;
-	}
-
-	return true;
+	return position + velocity * dt + acceleration * (0.5f * dt * dt) + jerk * (dt * dt * dt / 6.f);
 }
 
 bool isFresh(uint64_t now_us, uint64_t timestamp_us, uint64_t timeout_us)

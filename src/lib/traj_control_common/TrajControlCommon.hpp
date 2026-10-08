@@ -45,6 +45,9 @@
 #include <drivers/drv_hrt.h>
 #include <px4_platform_common/module_params.h>
 #include <uORB/Publication.hpp>
+#include <uORB/Subscription.hpp>
+#include <uORB/topics/vehicle_angular_velocity.h>
+#include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/traj_control_status.h>
 #include <uORB/topics/trajectory_reference.h>
 #include <uORB/topics/vehicle_local_position.h>
@@ -55,6 +58,26 @@
 
 namespace traj_control
 {
+
+/**
+ * Inputs shared by LAB and FL, in the paper's frame (x North, y East, z Up; see TrajControlMath.hpp).
+ * Both controllers read the state from EKF2 through exactly the same path.
+ */
+struct Inputs {
+	matrix::Vector3f position{};       // [m]
+	matrix::Vector3f velocity{};       // [m/s]
+	matrix::Vector3f euler{};          // phi, theta, psi [rad]
+	matrix::Vector3f euler_rate{};     // [rad/s]
+	matrix::Vector3f ref_position{};   // reference at this sample
+	matrix::Vector3f ref_velocity{};
+	matrix::Vector3f ref_position_next{}; // reference one sample ahead (the discrete laws use x_ref(i+1))
+	float ref_yaw{0.f};
+	float ref_yaw_next{0.f};
+	float ref_yaw_rate{0.f};
+	hrt_abstime timestamp_sample{0};
+	trajectory_reference_s reference{};  // as received (NED), for the status message
+	vehicle_local_position_s local_position{};
+};
 
 class TrajControlCommon : public ModuleParams
 {
@@ -73,6 +96,12 @@ public:
 	hrt_abstime referenceTimeout() const { return static_cast<hrt_abstime>(_param_tcc_ref_tout.get() * 1e6f); }
 	hrt_abstime estimateTimeout() const { return static_cast<hrt_abstime>(_param_tcc_est_tout.get() * 1e6f); }
 
+	/**
+	 * Read the latest state estimate and reference. Returns false (and leaves `in` unspecified) if any input is
+	 * missing, older than TCC_EST_TOUT / TCC_REF_TOUT, or flagged invalid (position, heading or reference).
+	 */
+	bool readInputs(hrt_abstime now, Inputs &in);
+
 	/** Convert the paper's inputs into normalized setpoints (see traj_control::toSetpoints). */
 	Setpoints compute(const matrix::Vector3f &euler, const matrix::Vector3f &euler_rate, const Command &command) const
 	{
@@ -82,8 +111,12 @@ public:
 	/** Publish vehicle_thrust_setpoint and vehicle_torque_setpoint. Only the active controller may call this. */
 	void publishSetpoints(const Setpoints &setpoints, hrt_abstime timestamp, hrt_abstime timestamp_sample);
 
-	/** Publish an idle (zero torque, minimum thrust) setpoint, e.g. on leaving the mode. */
-	void publishIdle(hrt_abstime timestamp);
+	/**
+	 * Publish a neutral setpoint (hover thrust, zero torque). Used while the mode is active but the inputs are
+	 * missing or stale, until the safety logic takes the vehicle out of the mode. It keeps the setpoints fresh
+	 * instead of letting the allocator hold the last control output.
+	 */
+	void publishNeutral(hrt_abstime timestamp);
 
 	/** Restart the per-run saturation counter (call on every entry into the mode). */
 	void resetSaturationCount() { _saturation_count = 0; }
@@ -100,6 +133,11 @@ private:
 	VehicleModel _model{};
 	Limits _limits{};
 	uint32_t _saturation_count{0};
+
+	uORB::Subscription _local_position_sub{ORB_ID(vehicle_local_position)};
+	uORB::Subscription _attitude_sub{ORB_ID(vehicle_attitude)};
+	uORB::Subscription _angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
+	uORB::Subscription _reference_sub{ORB_ID(trajectory_reference)};
 
 	uORB::Publication<vehicle_thrust_setpoint_s> _thrust_pub{ORB_ID(vehicle_thrust_setpoint)};
 	uORB::Publication<vehicle_torque_setpoint_s> _torque_pub{ORB_ID(vehicle_torque_setpoint)};

@@ -1,0 +1,5 @@
+menuconfig MODULES_LAB_CONTROL
+	bool "lab_control"
+	default n
+	---help---
+		Enable support for lab_control (LAB trajectory-tracking flight mode)

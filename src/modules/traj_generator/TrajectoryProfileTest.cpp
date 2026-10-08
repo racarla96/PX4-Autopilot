@@ -182,3 +182,74 @@ TEST(TrajectoryProfile, DeterministicForSameInputs)
 		EXPECT_EQ(a.jerk[i], b.jerk[i]);
 	}
 }
+
+TEST(TrajectoryProfile, PaperMatchesMatlabReference)
+{
+	// Samples of x_ref - x_ref(0), y_ref - y_ref(0), z_ref and psi_ref from run_simulation.m (Ts = 0.02 s).
+	// The paper's z points up, the generator publishes NED. The MATLAB arrays repeat the sample at t = 40 s,
+	// so leg-2 samples are one sample (0.02 s) late: z is compared with 2 mm tolerance.
+	struct Sample { float t, x, y, z_up, psi; };
+	const Sample samples[] = {
+		{0.00f, 0.0000000f, 0.0000000f, 0.0000000f, 0.0000000f},
+		{2.00f, -1.1292849f, 0.3493288f, 0.1000000f, 0.6000000f},
+		{10.00f, -0.2822400f, 3.9799850f, 0.5000000f, 3.0000000f},
+		{25.00f, -1.8760000f, 1.3067294f, 1.2500000f, 7.5000000f},
+		{39.98f, 1.0832527f, 0.3187613f, 1.9990000f, 11.9940000f},
+		{40.00f, 1.0731458f, 0.3122921f, 2.0000000f, 12.0000000f},
+		{50.00f, 1.0731458f, 0.3122921f, 1.5010000f, 12.0000000f},
+		{60.00f, 1.0731458f, 0.3122921f, 1.0010000f, 12.0000000f},
+		{79.98f, 1.0731458f, 0.3122921f, 0.0020000f, 12.0000000f},
+	};
+
+	ProfileParams params;
+	params.type = TrajectoryType::Paper;
+	const ProfileStart start = makeStart();
+
+	for (const Sample &s : samples) {
+		const ProfileReference ref = evaluate(params, start, s.t);
+		EXPECT_NEAR(ref.position[0] - start.x, s.x, 1e-4f) << "t=" << s.t;
+		EXPECT_NEAR(ref.position[1] - start.y, s.y, 1e-4f) << "t=" << s.t;
+		EXPECT_NEAR(start.z - ref.position[2], s.z_up, 2e-3f) << "t=" << s.t;
+		EXPECT_NEAR(ref.yaw - start.yaw, s.psi, 1e-4f) << "t=" << s.t;
+	}
+}
+
+TEST(TrajectoryProfile, PaperDerivativesAreConsistentWithinLegs)
+{
+	ProfileParams params;
+	params.type = TrajectoryType::Paper;
+	const ProfileStart start = makeStart();
+	const float h = 1e-2f;
+
+	// Away from the velocity step at t = 40 s
+	for (float t = 0.5f; t < 79.f; t += 0.73f) {
+		if (fabsf(t - 40.f) < 0.1f) {
+			continue;
+		}
+
+		const ProfileReference a = evaluate(params, start, t - h);
+		const ProfileReference b = evaluate(params, start, t + h);
+		const ProfileReference c = evaluate(params, start, t);
+
+		for (int i = 0; i < 3; i++) {
+			EXPECT_NEAR(c.velocity[i], (b.position[i] - a.position[i]) / (2.f * h), 3e-3f) << "t=" << t << " axis=" << i;
+			EXPECT_NEAR(c.acceleration[i], (b.velocity[i] - a.velocity[i]) / (2.f * h), 3e-3f) << "t=" << t << " axis=" << i;
+			EXPECT_NEAR(c.jerk[i], (b.acceleration[i] - a.acceleration[i]) / (2.f * h), 3e-3f) << "t=" << t << " axis=" << i;
+		}
+	}
+}
+
+TEST(TrajectoryProfile, PaperFinishesAtRestAtStartAltitude)
+{
+	ProfileParams params;
+	params.type = TrajectoryType::Paper;
+	const ProfileStart start = makeStart();
+	const ProfileReference end = evaluate(params, start, 80.f);
+	EXPECT_TRUE(end.finished);
+	EXPECT_FALSE(evaluate(params, start, 79.9f).finished);
+	EXPECT_NEAR(end.position[2], start.z, 1e-4f);
+
+	for (int i = 0; i < 3; i++) {
+		EXPECT_FLOAT_EQ(end.velocity[i], 0.f);
+	}
+}

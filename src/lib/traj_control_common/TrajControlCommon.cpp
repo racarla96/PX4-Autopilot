@@ -64,6 +64,55 @@ void TrajControlCommon::updateParams()
 	_limits.tilt_max = math::radians(_param_tcc_tilt_max.get());
 }
 
+bool TrajControlCommon::readInputs(hrt_abstime now, Inputs &in)
+{
+	vehicle_attitude_s attitude{};
+	vehicle_angular_velocity_s angular_velocity{};
+
+	if (!_local_position_sub.copy(&in.local_position) || !_attitude_sub.copy(&attitude)
+	    || !_angular_velocity_sub.copy(&angular_velocity) || !_reference_sub.copy(&in.reference)) {
+		return false;
+	}
+
+	const hrt_abstime est_timeout = estimateTimeout();
+
+	if (!isFresh(now, in.local_position.timestamp, est_timeout) || !isFresh(now, attitude.timestamp, est_timeout)
+	    || !isFresh(now, angular_velocity.timestamp, est_timeout)
+	    || !isFresh(now, in.reference.timestamp, referenceTimeout())) {
+		return false;
+	}
+
+	if (!in.reference.valid || !in.local_position.xy_valid || !in.local_position.z_valid
+	    || !in.local_position.v_xy_valid || !in.local_position.v_z_valid
+	    || !in.local_position.heading_good_for_control) {
+		return false;
+	}
+
+	const matrix::Eulerf euler(matrix::Quatf(attitude.q));
+	in.euler = matrix::Vector3f(euler.phi(), euler.theta(), euler.psi());
+	in.euler_rate = bodyRatesToEulerRates(in.euler, matrix::Vector3f(angular_velocity.xyz));
+
+	in.position = nedToPaper(matrix::Vector3f(in.local_position.x, in.local_position.y, in.local_position.z));
+	in.velocity = nedToPaper(matrix::Vector3f(in.local_position.vx, in.local_position.vy, in.local_position.vz));
+
+	const matrix::Vector3f ref_p = nedToPaper(matrix::Vector3f(in.reference.position));
+	const matrix::Vector3f ref_v = nedToPaper(matrix::Vector3f(in.reference.velocity));
+	const matrix::Vector3f ref_a = nedToPaper(matrix::Vector3f(in.reference.acceleration));
+	const matrix::Vector3f ref_j = nedToPaper(matrix::Vector3f(in.reference.jerk));
+	const float Ts = samplePeriod();
+
+	in.ref_position = ref_p;
+	in.ref_velocity = ref_v;
+	in.ref_position_next = extrapolate(ref_p, ref_v, ref_a, ref_j, Ts);
+	in.ref_yaw = in.reference.yaw;
+	in.ref_yaw_next = in.reference.yaw + in.reference.yaw_rate * Ts;
+	in.ref_yaw_rate = in.reference.yaw_rate;
+	in.timestamp_sample = angular_velocity.timestamp_sample;
+
+	return PX4_ISFINITE(in.euler(0)) && PX4_ISFINITE(in.euler(1)) && PX4_ISFINITE(in.euler(2))
+	       && PX4_ISFINITE(in.position(0)) && PX4_ISFINITE(in.velocity(0)) && PX4_ISFINITE(in.ref_position(0));
+}
+
 void TrajControlCommon::publishSetpoints(const Setpoints &setpoints, hrt_abstime timestamp, hrt_abstime timestamp_sample)
 {
 	vehicle_thrust_setpoint_s thrust{};
@@ -79,12 +128,12 @@ void TrajControlCommon::publishSetpoints(const Setpoints &setpoints, hrt_abstime
 	_torque_pub.publish(torque);
 }
 
-void TrajControlCommon::publishIdle(hrt_abstime timestamp)
+void TrajControlCommon::publishNeutral(hrt_abstime timestamp)
 {
-	Setpoints idle;
-	idle.thrust_norm = _limits.thrust_min;
-	idle.thrust = matrix::Vector3f(0.f, 0.f, -_limits.thrust_min);
-	publishSetpoints(idle, timestamp, timestamp);
+	Setpoints neutral;
+	neutral.thrust_norm = math::constrain(_model.hover_thrust, _limits.thrust_min, _limits.thrust_max);
+	neutral.thrust = matrix::Vector3f(0.f, 0.f, -neutral.thrust_norm);
+	publishSetpoints(neutral, timestamp, timestamp);
 }
 
 void TrajControlCommon::publishStatus(uint8_t controller, bool active, hrt_abstime timestamp,

@@ -178,8 +178,66 @@ void path(TrajectoryType type, float amplitude, float phi, float p[2], float p1[
 
 } // namespace
 
+ProfileReference evaluatePaper(const ProfileStart &start, float t)
+{
+	constexpr float R = kPaperRadius;
+	constexpr float w = kPaperOmega;
+	constexpr float T = kPaperLegTime;
+
+	ProfileReference ref;
+
+	if (t < 0.f) {
+		t = 0.f;
+	}
+
+	ref.finished = (t >= 2.f * T);
+	const float t1 = (t < T) ? t : T; // time spent on the circle leg
+
+	// Leg 1: x = -R sin(w t), y = R (1 - cos(w t)) relative to the start (the paper's circle shifted to start there)
+	ref.position[0] = start.x - R * sinf(w * t1);
+	ref.position[1] = start.y + R * (1.f - cosf(w * t1));
+
+	// Altitude: the paper's z points up. Climb during leg 1, then descend back to the start altitude during leg 2.
+	const float climb = kPaperClimbRate * T; // altitude gained at the end of leg 1 [m]
+	float z_up;
+	float vz_up;
+
+	if (t < T) {
+		z_up = kPaperClimbRate * t;
+		vz_up = kPaperClimbRate;
+
+	} else if (t < 2.f * T) {
+		z_up = climb - (climb / T) * (t - T);
+		vz_up = -climb / T;
+
+	} else {
+		z_up = 0.f;
+		vz_up = 0.f;
+	}
+
+	ref.position[2] = start.z - z_up;
+	ref.velocity[2] = -vz_up;
+
+	if (t < T) {
+		ref.velocity[0] = -R * w * cosf(w * t);
+		ref.velocity[1] = R * w * sinf(w * t);
+		ref.acceleration[0] = R * w * w * sinf(w * t);
+		ref.acceleration[1] = R * w * w * cosf(w * t);
+		ref.jerk[0] = R * w * w * w * cosf(w * t);
+		ref.jerk[1] = -R * w * w * w * sinf(w * t);
+		ref.yaw_rate = w;
+	}
+
+	ref.yaw = start.yaw + w * t1;
+	return ref;
+}
+
 ProfileReference evaluate(const ProfileParams &params, const ProfileStart &start, float t)
 {
+	if (params.type == TrajectoryType::Paper) {
+		return evaluatePaper(start, t);
+	}
+
 	ProfileReference ref;
 
 	if (t < 0.f) {
