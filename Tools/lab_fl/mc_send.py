@@ -3,11 +3,14 @@
 
 LAB and FL require a manual control link (the safety pilot must be able to take over), and the simulator
 has no radio. Not needed when QGroundControl's virtual joystick or a real joystick is enabled.
+
+It talks to the "onboard" MAVLink instance (UDP 14580), NOT to the GCS instance (18570): PX4 sends its telemetry to the
+last address that wrote to a UDP instance, so writing to 18570 would take the telemetry away from QGroundControl.
 """
 import time
 from pymavlink import mavutil
 
-m = mavutil.mavlink_connection('udpout:127.0.0.1:18570', source_system=255, source_component=190)
+m = mavutil.mavlink_connection('udpout:127.0.0.1:14580', source_system=255, source_component=190)
 n = 0
 while True:
     if n % 20 == 0:
