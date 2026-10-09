@@ -24,8 +24,8 @@ Everything runs in Docker image `px4io/px4-dev:v1.17.0`:
     docker run --rm -u $(id -u):$(id -g) -v "$PWD":/src -w /src -e HOME=/tmp px4io/px4-dev:v1.17.0 make px4_fmu-v3_default
 
 Flash with QGroundControl (custom firmware) or `make px4_fmu-v3_default upload`.
-Flash use on fmu-v3 is 98.68 % (limit 2,080,768 B, about 27 KB free). Before adding features, remove modules you do not use
-(fixed wing, VTOL, UUV) in `boards/px4/fmu-v3/default.px4board`, and check the size with `arm-none-eabi-size`.
+Flash use on fmu-v3 is 98.68 % (limit 2,080,768 B, about 27 KB free). Only if a build no longer fits, remove modules you do not use (fixed wing, VTOL, UUV) in
+`boards/px4/fmu-v3/default.px4board`. Check the size with `arm-none-eabi-size`.
 
 Unit tests (laws, trajectories, safety monitor):
 
