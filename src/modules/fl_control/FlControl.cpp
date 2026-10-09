@@ -84,6 +84,7 @@ fl_control::Gains FlControl::gains() const
 	g.k_yaw[1] = _param_k42.get();
 	g.exact_fz = _param_exact_fz.get() != 0;
 	g.model_derivatives = _param_model_deriv.get() != 0;
+	g.heading_compensation = _common.headingCompensation();
 	return g;
 }
 

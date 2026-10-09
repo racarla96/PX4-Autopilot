@@ -55,6 +55,7 @@ enum class TrajectoryType : int {
 	Circle = 1,
 	Figure8 = 2,
 	Paper = 3,
+	Paper2 = 4,
 };
 
 struct ProfileParams {
@@ -96,6 +97,19 @@ constexpr float kPaperLegTime = 40.f;     // duration of each of the two legs [s
  * the start altitude. It has no ramp: the velocity steps at t = 0 and at t = 40 s, exactly as in the paper.
  */
 ProfileReference evaluatePaper(const ProfileStart &start, float t);
+
+/** Duration of the paper's second trajectory [s]. */
+constexpr float kPaper2Duration = 35.f;
+
+/**
+ * The paper's second reference (waypoints of data/referencia_externa.mat), relative to the start state: seven 5 s
+ * point-to-point moves, each a minimum-snap (7th order) polynomial that starts and ends at rest with zero acceleration
+ * and jerk, one axis at a time, while the yaw alternates between 0 and pi:
+ *   0-5 s climb 5 m, 5-10 s x +5 m, 10-15 s y +10 m, 15-20 s x -5 m, 20-25 s descend 2 m, 25-30 s x +5 m, 30-35 s descend
+ *   3 m (back to the start altitude).
+ * Velocities up to 4.4 m/s, yaw rate up to 1.4 rad/s. Matches the file to 1e-13 (the last move to 8 mm).
+ */
+ProfileReference evaluatePaper2(const ProfileStart &start, float t);
 
 /**
  * Evaluate the reference at time t (seconds since the start of the trajectory).

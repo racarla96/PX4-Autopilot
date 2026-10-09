@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # SITL helper for the LAB and FL flight modes.
 #
-#   sitl.sh start [sih|gz] [circle|paper]   start PX4 SITL and apply the vehicle calibration
+#   sitl.sh start [sih|gz] [circle|paper|paper2]   start PX4 SITL and apply the vehicle calibration
 #                                           sih: SIH quadrotor, headless, in Docker (default)
 #                                           gz:  Gazebo x500 with the 3D window, on the host (spawned facing north)
-#                                           trajectory: circle (yaw constant, default) or paper
+#                                           trajectory: circle (yaw constant, default), paper (first trajectory of the
+#                                           study, yaw ramp) or paper2 (second one, waypoints, yaw 0 <-> pi)
+#   sitl.sh gains lab|fl robust|paper1|paper2|fast2  controller gains: robust = module defaults, fast2 = FL poles -3..-6, paperN = the study's gains
+#                                           for its trajectory N (FL with the paper's filtered derivatives; paper2 at Ts = 0.01 s)
 #   sitl.sh demo lab|fl                     arm, take off and switch to the mode
 #   sitl.sh hold                            safe exit: back to Hold
 #   sitl.sh land                            land
@@ -68,7 +71,7 @@ case "${1:-}" in
 start)
 	backend=${2:-sih}
 	traj=${3:-circle}
-	if [ "$backend" = circle ] || [ "$backend" = paper ]; then traj=$backend; backend=sih; fi
+	if [ "$backend" = circle ] || [ "$backend" = paper ] || [ "$backend" = paper2 ]; then traj=$backend; backend=sih; fi
 	stop_all
 	mkdir -p "$RT"
 	if [ "$backend" = gz ]; then
@@ -100,10 +103,29 @@ start)
 	calibration "$backend"
 	case "$traj" in
 	paper) send "param set TRJ_TYPE 3" ;;
+	paper2) send "param set TRJ_TYPE 4" ;;
 	*) send "param set TRJ_TYPE 1"; send "param set TRJ_DURATION 60" ;;
 	esac
 	wait_ready
 	echo "PX4 SITL ($backend) is running (trajectory: $traj). Open QGroundControl, then: $0 demo lab"
+	;;
+gains)
+	ctrl=${2:?usage: gains lab|fl robust|paper1|paper2}
+	set_ts=0.02
+	list=""
+	case "$ctrl:${3:-robust}" in
+	lab:robust | lab:paper1) list="LAB_K1 0.99|LAB_K2 0.97|LAB_K3 0.99|LAB_K4 0.98|LAB_K5 0.99|LAB_K6 0.79|LAB_K7 0.96|LAB_K8 0.91|LAB_K9 0.96|LAB_K10 0.92|LAB_K11 0.99|LAB_K12 0.95" ;;
+	lab:paper2) set_ts=0.01; list="LAB_K1 0.99|LAB_K2 0.89|LAB_K3 0.99|LAB_K4 0.89|LAB_K5 0.99|LAB_K6 0.79|LAB_K7 0.85|LAB_K8 0.81|LAB_K9 0.85|LAB_K10 0.81|LAB_K11 0.85|LAB_K12 0.95" ;;
+	fl:robust) list="FL_K11 7.5|FL_K12 19.25|FL_K13 17.75|FL_K14 7.0|FL_K21 7.5|FL_K22 19.25|FL_K23 17.75|FL_K24 7.0|FL_K31 7.5|FL_K32 19.25|FL_K33 17.75|FL_K34 7.0|FL_K41 0.5|FL_K42 1.5|FL_MODEL_DERIV 1" ;;
+	fl:fast2) set_ts=0.01; list="FL_K11 360|FL_K12 342|FL_K13 119|FL_K14 18|FL_K21 360|FL_K22 342|FL_K23 119|FL_K24 18|FL_K31 360|FL_K32 342|FL_K33 119|FL_K34 18|FL_K41 18|FL_K42 6|FL_MODEL_DERIV 1" ;;
+	fl:paper1) list="FL_K11 1.452|FL_K12 3.509|FL_K13 2.41|FL_K14 2.9|FL_K21 1.26|FL_K22 2.5|FL_K23 2.26|FL_K24 2.5|FL_K31 1.6698|FL_K32 3.509|FL_K33 2.59|FL_K34 2.9|FL_K41 0.5|FL_K42 1.5|FL_MODEL_DERIV 0" ;;
+	fl:paper2) set_ts=0.01; list="FL_K11 0|FL_K12 49.375|FL_K13 6.25|FL_K14 7.9|FL_K21 0|FL_K22 50|FL_K23 6.25|FL_K24 8|FL_K31 0|FL_K32 58.32|FL_K33 7.29|FL_K34 8|FL_K41 18|FL_K42 6|FL_MODEL_DERIV 0" ;;
+	*) echo "usage: gains lab|fl robust|paper1|paper2" >&2; exit 1 ;;
+	esac
+	send "param set TCC_TS $set_ts"
+	IFS='|' read -ra items <<< "$list"
+	for p in "${items[@]}"; do send "param set $p"; done
+	echo "gains $ctrl ${3:-robust} applied (TCC_TS $set_ts)"
 	;;
 demo)
 	mode=${2:?usage: demo lab|fl}

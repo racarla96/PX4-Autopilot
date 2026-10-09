@@ -221,3 +221,18 @@ PARAM_DEFINE_FLOAT(TCC_REF_TOUT, 0.2f);
  * @group Trajectory Control
  */
 PARAM_DEFINE_FLOAT(TCC_EST_TOUT, 0.2f);
+
+/**
+ * Heading compensation
+ *
+ * The laws of the study assume that the vehicle heads North (its translation model does not contain the yaw angle).
+ * 0: apply them as they are (valid only while the heading is constant and North).
+ * 1: apply them in the frame aligned with the current heading: the desired horizontal acceleration is rotated by the
+ * heading before it is turned into roll and pitch (exact for the FL law, including the terms of the rotation).
+ * With a heading of 0 both settings are identical.
+ *
+ * @value 0 Off (as in the paper)
+ * @value 1 On
+ * @group Trajectory Control
+ */
+PARAM_DEFINE_INT32(TCC_HDG_COMP, 1);

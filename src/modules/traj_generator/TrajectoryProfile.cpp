@@ -232,10 +232,113 @@ ProfileReference evaluatePaper(const ProfileStart &start, float t)
 	return ref;
 }
 
+namespace
+{
+
+struct Paper2Move {
+	int axis;        // 0 x, 1 y, 2 z (up), 3 yaw (the yaw moves in parallel with every move)
+	float delta;     // displacement of the axis [m]
+	float yaw_from;  // [rad]
+	float yaw_to;
+};
+
+constexpr float kPaper2MoveTime = 5.f;
+constexpr Paper2Move kPaper2Moves[7] = {
+	{2, 5.f, 0.f, 3.14159265f},
+	{0, 5.f, 3.14159265f, 0.f},
+	{1, 10.f, 0.f, 3.14159265f},
+	{0, -5.f, 3.14159265f, 0.f},
+	{2, -2.f, 0.f, 3.14159265f},
+	{0, 5.f, 3.14159265f, 0.f},
+	{2, -3.f, 0.f, 3.14159265f},
+};
+
+// Minimum-snap polynomial s(tau) = 35 tau^4 - 84 tau^5 + 70 tau^6 - 20 tau^7 and its first three derivatives
+void septic(float tau, float s[4])
+{
+	const float t2 = tau * tau;
+	const float t3 = t2 * tau;
+	const float t4 = t3 * tau;
+	const float t5 = t4 * tau;
+	const float t6 = t5 * tau;
+	s[0] = 35.f * t4 - 84.f * t5 + 70.f * t6 - 20.f * t6 * tau;
+	s[1] = 140.f * t3 - 420.f * t4 + 420.f * t5 - 140.f * t6;
+	s[2] = 420.f * t2 - 1680.f * t3 + 2100.f * t4 - 840.f * t5;
+	s[3] = 840.f * tau - 5040.f * t2 + 8400.f * t3 - 4200.f * t4;
+}
+
+} // namespace
+
+ProfileReference evaluatePaper2(const ProfileStart &start, float t)
+{
+	constexpr float T = kPaper2MoveTime;
+	ProfileReference ref;
+
+	if (t < 0.f) {
+		t = 0.f;
+	}
+
+	ref.finished = (t >= kPaper2Duration);
+
+	// Paper-frame (z up) displacement and its derivatives, per axis; the finished moves hold their final value
+	float p[3] {};
+	float v[3] {};
+	float a[3] {};
+	float j[3] {};
+	float yaw = 0.f;
+	float yaw_rate = 0.f;
+
+	for (int m = 0; m < 7; m++) {
+		const float t0 = m * T;
+		const Paper2Move &move = kPaper2Moves[m];
+
+		if (t >= t0 + T) {
+			p[move.axis] += move.delta;
+			yaw = move.yaw_to;
+			continue;
+		}
+
+		if (t >= t0) {
+			float s[4];
+			septic((t - t0) / T, s);
+			p[move.axis] += move.delta * s[0];
+			v[move.axis] = move.delta * s[1] / T;
+			a[move.axis] = move.delta * s[2] / (T * T);
+			j[move.axis] = move.delta * s[3] / (T * T * T);
+			yaw = move.yaw_from + (move.yaw_to - move.yaw_from) * s[0];
+			yaw_rate = (move.yaw_to - move.yaw_from) * s[1] / T;
+		}
+
+		break;
+	}
+
+	// Paper frame (x North, y East, z up) to NED relative to the start
+	ref.position[0] = start.x + p[0];
+	ref.position[1] = start.y + p[1];
+	ref.position[2] = start.z - p[2];
+
+	for (int i = 0; i < 2; i++) {
+		ref.velocity[i] = v[i];
+		ref.acceleration[i] = a[i];
+		ref.jerk[i] = j[i];
+	}
+
+	ref.velocity[2] = -v[2];
+	ref.acceleration[2] = -a[2];
+	ref.jerk[2] = -j[2];
+	ref.yaw = start.yaw + yaw;
+	ref.yaw_rate = yaw_rate;
+	return ref;
+}
+
 ProfileReference evaluate(const ProfileParams &params, const ProfileStart &start, float t)
 {
 	if (params.type == TrajectoryType::Paper) {
 		return evaluatePaper(start, t);
+	}
+
+	if (params.type == TrajectoryType::Paper2) {
+		return evaluatePaper2(start, t);
 	}
 
 	ProfileReference ref;

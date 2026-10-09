@@ -79,6 +79,7 @@ struct Gains {
 	float k_yaw[2] {0.5f, 1.5f};
 	bool exact_fz{false};  // false: fz exactly as in the paper's Simulink model, true: exact derivative
 	bool model_derivatives{true};  // true: acceleration and jerk from the model, false: filtered velocity as in the paper
+	bool heading_compensation{false};  // exact law for a heading that is not North (needs model_derivatives, see TCC_HDG_COMP)
 };
 
 struct State {

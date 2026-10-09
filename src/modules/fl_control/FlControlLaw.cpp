@@ -162,24 +162,58 @@ Output FlControlLaw::step(const Gains &gains, float mass, float Ts, float tau_fi
 		modelAccelerationAndJerk(mass, kGravity, _u, _u_dot, state.euler, state.euler_rate, model_accel, model_jerk);
 	}
 
-	for (int i = 0; i < 3; i++) {
-		float accel;
-		float jerk;
-
-		if (gains.model_derivatives) {
-			accel = model_accel[i];
-			jerk = model_jerk[i];
-
-		} else {
-			accel = _accel[i].step(state.velocity[i], Ts, tau_filter);
-			jerk = _jerk[i].step(accel, Ts, tau_filter);
-		}
-
-		v[i] = gains.k[i][0] * (ref.position[i] - state.position[i]) + gains.k[i][1] * (ref.velocity[i] - state.velocity[i])
-		       - gains.k[i][2] * accel - gains.k[i][3] * jerk;
-	}
+	// Heading compensation: the plant is a_world = R(psi) a_h with a_h the paper's horizontal acceleration (a function of u,
+	// phi, theta). Rotating the world-frame position loops into the heading frame needs the rotation terms:
+	//   a_world'' = R (a_h'' + 2 psi_dot J a_h' + psi_ddot J a_h - psi_dot^2 a_h),  J = [[0, -1], [1, 0]]
+	// psi_ddot is the yaw input, which does not depend on the position loops, so it is computed first.
+	const bool rotate = gains.heading_compensation && gains.model_derivatives;
+	const float psi = state.euler[2];
+	const float psi_dot = state.euler_rate[2];
+	const float cpsi = rotate ? cosf(psi) : 1.f;
+	const float spsi = rotate ? sinf(psi) : 0.f;
 
 	v[3] = gains.k_yaw[0] * wrapPi(ref.yaw - state.euler[2]) + gains.k_yaw[1] * (ref.yaw_rate - state.euler_rate[2]);
+
+	float accel_w[3] {};
+	float jerk_w[3] {};
+
+	for (int i = 0; i < 3; i++) {
+		if (gains.model_derivatives) {
+			accel_w[i] = model_accel[i];
+			jerk_w[i] = model_jerk[i];
+
+		} else {
+			accel_w[i] = _accel[i].step(state.velocity[i], Ts, tau_filter);
+			jerk_w[i] = _jerk[i].step(accel_w[i], Ts, tau_filter);
+		}
+	}
+
+	if (rotate) {
+		const float ah[2] = {model_accel[0], model_accel[1]};
+		const float jh[2] = {model_jerk[0], model_jerk[1]};
+		accel_w[0] = cpsi * ah[0] - spsi * ah[1];
+		accel_w[1] = spsi * ah[0] + cpsi * ah[1];
+		// a_w' = R (psi_dot J a_h + a_h')
+		const float jx = -psi_dot * ah[1] + jh[0];
+		const float jy = psi_dot * ah[0] + jh[1];
+		jerk_w[0] = cpsi * jx - spsi * jy;
+		jerk_w[1] = spsi * jx + cpsi * jy;
+	}
+
+	for (int i = 0; i < 3; i++) {
+		v[i] = gains.k[i][0] * (ref.position[i] - state.position[i]) + gains.k[i][1] * (ref.velocity[i] - state.velocity[i])
+		       - gains.k[i][2] * accel_w[i] - gains.k[i][3] * jerk_w[i];
+	}
+
+	if (rotate) {
+		const float ah[2] = {model_accel[0], model_accel[1]};
+		const float jh[2] = {model_jerk[0], model_jerk[1]};
+		const float vh_x = cpsi * v[0] + spsi * v[1];
+		const float vh_y = -spsi * v[0] + cpsi * v[1];
+		// a_h'' = R^T v + psi_dot^2 a_h - 2 psi_dot J a_h' - psi_ddot J a_h
+		v[0] = vh_x + psi_dot * psi_dot * ah[0] - 2.f * psi_dot * (-jh[1]) - v[3] * (-ah[1]);
+		v[1] = vh_y + psi_dot * psi_dot * ah[1] - 2.f * psi_dot * jh[0] - v[3] * ah[0];
+	}
 
 	float G[4][4];
 	float f[3];

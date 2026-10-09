@@ -50,6 +50,7 @@ namespace lab_control
 /** k_1 .. k_12 of the paper: [x, vx, y, vy, z, vz, phi, phi_dot, theta, theta_dot, psi, psi_dot]. */
 struct Gains {
 	float k[12] {0.99f, 0.97f, 0.99f, 0.98f, 0.99f, 0.79f, 0.96f, 0.91f, 0.96f, 0.92f, 0.99f, 0.95f};
+	bool heading_compensation{false};  // rotate the desired horizontal velocity change by the heading (see TCC_HDG_COMP)
 };
 
 struct State {

@@ -86,6 +86,17 @@ Output compute(const Gains &gains, float mass, float Ts, float gravity, const St
 	const float w_ref_n = (wrapPi(next.yaw - state.euler[2]) - k[10] * e_psi) / Ts;
 	const float delta_w = (1.f - k[11]) * (w_ref_n - state.euler_rate[2]);
 
+	// Heading compensation: the desired velocity change is in the world frame, the paper's roll and pitch relations
+	// assume the vehicle heads North, so express it along the current heading (forward, right)
+	if (gains.heading_compensation) {
+		const float c = cosf(state.euler[2]);
+		const float s = sinf(state.euler[2]);
+		const float dx = delta_v[0];
+		const float dy = delta_v[1];
+		delta_v[0] = c * dx + s * dy;
+		delta_v[1] = -s * dx + c * dy;
+	}
+
 	// Roll and pitch references: phi_ref = atan(d4 / (d6 + g Ts)), theta_ref = atan(-d2 sin(phi_ref) / d4).
 	// Since sin(phi_ref) / d4 = 1 / hypot(d4, d6 + g Ts), theta_ref has no singularity at d4 = 0.
 	const float a = delta_v[2] + gravity * Ts;

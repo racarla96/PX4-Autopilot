@@ -253,3 +253,66 @@ TEST(TrajectoryProfile, PaperFinishesAtRestAtStartAltitude)
 		EXPECT_FLOAT_EQ(end.velocity[i], 0.f);
 	}
 }
+
+TEST(TrajectoryProfile, Paper2MatchesTheExternalReferenceFile)
+{
+	// Samples of data/referencia_externa.mat (paper frame: z up): t, x, y, z, psi, vx, vy, vz, psi_dot
+	struct Sample { float t, x, y, z_up, psi, vx, vy, vz_up, dpsi; };
+	const Sample samples[] = {
+		{0.00f, 0.0000000f, 0.0000000f, 0.0000000f, 0.0000000f, 0.0000000f, 0.0000000f, 0.0000000f, 0.0000000f},
+		{1.00f, 0.0000000f, 0.0000000f, 0.1667200f, 0.1047533f, 0.0000000f, 0.0000000f, 0.5734400f, 0.3603030f},
+		{2.50f, 0.0000000f, 0.0000000f, 2.5000000f, 1.5707963f, 0.0000000f, 0.0000000f, 2.1875000f, 1.3744468f},
+		{4.00f, 0.0000000f, 0.0000000f, 4.8332800f, 3.0368394f, 0.0000000f, 0.0000000f, 0.5734400f, 0.3603030f},
+		{5.00f, 0.0000000f, 0.0000000f, 5.0000000f, 3.1415927f, 0.0000000f, 0.0000000f, 0.0000000f, 0.0000000f},
+		{7.50f, 2.5000000f, 0.0000000f, 5.0000000f, 1.5707963f, 2.1875000f, 0.0000000f, 0.0000000f, -1.3744468f},
+		{12.00f, 5.0000000f, 2.8979200f, 5.0000000f, 0.9104084f, 0.0000000f, 3.8707200f, 0.0000000f, 1.2160226f},
+		{16.00f, 4.8332800f, 10.0000000f, 5.0000000f, 3.0368394f, -0.5734400f, 0.0000000f, 0.0000000f, -0.3603030f},
+		{22.50f, 0.0000000f, 10.0000000f, 4.0000000f, 1.5707963f, 0.0000000f, 0.0000000f, -0.8750000f, 1.3744468f},
+		{27.50f, 2.5000000f, 10.0000000f, 3.0000000f, 1.5707963f, 2.1875000f, 0.0000000f, 0.0000000f, -1.3744468f},
+		{31.00f, 5.0000000f, 10.0000000f, 2.9006532f, 0.1040357f, 0.0000000f, 0.0000000f, -0.3418364f, 0.3579703f},
+		{34.00f, 5.0000000f, 10.0000000f, 0.1028037f, 3.0339368f, 0.0000000f, 0.0000000f, -0.3495661f, 0.3660648f},
+		{35.00f, 5.0000000f, 10.0000000f, 0.0000000f, 3.1415927f, 0.0000000f, 0.0000000f, -0.0000007f, 0.0000007f},
+	};
+
+	ProfileParams params;
+	params.type = TrajectoryType::Paper2;
+	const ProfileStart start = makeStart();
+
+	for (const Sample &s : samples) {
+		const ProfileReference ref = evaluate(params, start, s.t);
+		const float tol = (s.t > 30.f) ? 1e-2f : 1e-4f; // the last move of the file is 8 mm off the exact polynomial
+		EXPECT_NEAR(ref.position[0] - start.x, s.x, tol) << "t=" << s.t;
+		EXPECT_NEAR(ref.position[1] - start.y, s.y, tol) << "t=" << s.t;
+		EXPECT_NEAR(start.z - ref.position[2], s.z_up, tol) << "t=" << s.t;
+		EXPECT_NEAR(ref.yaw - start.yaw, s.psi, tol) << "t=" << s.t;
+		EXPECT_NEAR(ref.velocity[0], s.vx, tol) << "t=" << s.t;
+		EXPECT_NEAR(ref.velocity[1], s.vy, tol) << "t=" << s.t;
+		EXPECT_NEAR(-ref.velocity[2], s.vz_up, tol) << "t=" << s.t;
+		EXPECT_NEAR(ref.yaw_rate, s.dpsi, tol) << "t=" << s.t;
+	}
+
+	EXPECT_TRUE(evaluate(params, start, 35.f).finished);
+	EXPECT_FALSE(evaluate(params, start, 34.9f).finished);
+}
+
+TEST(TrajectoryProfile, Paper2DerivativesAreConsistent)
+{
+	ProfileParams params;
+	params.type = TrajectoryType::Paper2;
+	const ProfileStart start = makeStart();
+	const float h = 3e-2f; // single precision: the 7th order polynomial limits the finite difference accuracy
+
+	for (float t = 0.3f; t < 34.7f; t += 0.37f) {
+		const ProfileReference a = evaluate(params, start, t - h);
+		const ProfileReference b = evaluate(params, start, t + h);
+		const ProfileReference c = evaluate(params, start, t);
+
+		for (int i = 0; i < 3; i++) {
+			EXPECT_NEAR((b.position[i] - a.position[i]) / (2.f * h), c.velocity[i], 5e-3f) << "t=" << t;
+			EXPECT_NEAR((b.velocity[i] - a.velocity[i]) / (2.f * h), c.acceleration[i], 5e-3f) << "t=" << t;
+			EXPECT_NEAR((b.acceleration[i] - a.acceleration[i]) / (2.f * h), c.jerk[i], 2e-2f) << "t=" << t;
+		}
+
+		EXPECT_NEAR((b.yaw - a.yaw) / (2.f * h), c.yaw_rate, 2e-3f) << "t=" << t;
+	}
+}

@@ -76,6 +76,7 @@ lab_control::Gains LabControl::gains() const
 		g.k[i] = values[i];
 	}
 
+	g.heading_compensation = _common.headingCompensation();
 	return g;
 }
 

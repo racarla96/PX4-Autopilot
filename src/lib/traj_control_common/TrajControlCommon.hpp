@@ -101,6 +101,8 @@ public:
 
 	/** Controller sample time Ts [s] (TCC_TS). Both controllers run at the same rate. */
 	float samplePeriod() const { return _param_tcc_ts.get(); }
+	/** True: the laws work in the heading-aligned frame (TCC_HDG_COMP = 1). */
+	bool headingCompensation() const { return _param_tcc_heading_frame.get() != 0; }
 	hrt_abstime referenceTimeout() const { return static_cast<hrt_abstime>(_param_tcc_ref_tout.get() * 1e6f); }
 	hrt_abstime estimateTimeout() const { return static_cast<hrt_abstime>(_param_tcc_est_tout.get() * 1e6f); }
 
@@ -167,6 +169,7 @@ private:
 		(ParamFloat<px4::params::TCC_ALPHA_Z>) _param_tcc_alpha_z,
 		(ParamFloat<px4::params::TCC_TILT_MAX>) _param_tcc_tilt_max,
 		(ParamFloat<px4::params::TCC_TS>) _param_tcc_ts,
+		(ParamInt<px4::params::TCC_HDG_COMP>) _param_tcc_heading_frame,
 		(ParamFloat<px4::params::TCC_REF_TOUT>) _param_tcc_ref_tout,
 		(ParamFloat<px4::params::TCC_EST_TOUT>) _param_tcc_est_tout,
 		(ParamFloat<px4::params::MPC_THR_HOVER>) _param_mpc_thr_hover

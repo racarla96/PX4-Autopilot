@@ -427,3 +427,84 @@ TEST(FlControlLaw, ModelDerivativesAreRobustToActuatorLag)
 	const LagRun paper = runWithActuatorLag(false, 0.1);
 	EXPECT_FALSE(paper.stable);
 }
+
+namespace
+{
+
+// Ideal plant whose horizontal acceleration is rotated by the heading (the real physics, unlike the paper's plant).
+// Reference: the paper's first trajectory (circle R = 2, w = 0.3, yaw ramp psi = w t).
+double runWithRotatingHeading(bool compensation, double *max_tilt_deg, double yaw_rate_ref = 0.3)
+{
+	const double M = 1.0, R = 2., w = 0.3, dt = 0.002, T = 60.;
+	Gains gains;
+	gains.heading_compensation = compensation;
+	FlControlLaw law;
+	law.reset(static_cast<float>(M * kG));
+	double X[12] = {};
+	Output out;
+	double sum_sq = 0.;
+	int count = 0;
+	*max_tilt_deg = 0.;
+
+	for (int k = 0; k < static_cast<int>(T / dt); k++) {
+		const double t = k * dt;
+
+		if (k % 10 == 0) {
+			Reference ref;
+			ref.position[0] = static_cast<float>(-R * sin(w * t));
+			ref.position[1] = static_cast<float>(R * (1. - cos(w * t)));
+			ref.velocity[0] = static_cast<float>(-R * w * cos(w * t));
+			ref.velocity[1] = static_cast<float>(R * w * sin(w * t));
+			ref.yaw = static_cast<float>(yaw_rate_ref * t);
+			ref.yaw_rate = static_cast<float>(yaw_rate_ref);
+			out = law.step(gains, static_cast<float>(M), 0.02f, 0.01f, toState(X), ref);
+		}
+
+		const double u = static_cast<double>(out.thrust);
+		const auto f = [&](const double *s, double *d) {
+			const double ah_x = -u * sin(s[8]) / M, ah_y = u * cos(s[8]) * sin(s[6]) / M;
+			d[0] = s[1]; d[1] = cos(s[10]) * ah_x - sin(s[10]) * ah_y;
+			d[2] = s[3]; d[3] = sin(s[10]) * ah_x + cos(s[10]) * ah_y;
+			d[4] = s[5]; d[5] = u * cos(s[8]) * cos(s[6]) / M - kG;
+			d[6] = s[7]; d[7] = static_cast<double>(out.euler_accel[0]);
+			d[8] = s[9]; d[9] = static_cast<double>(out.euler_accel[1]);
+			d[10] = s[11]; d[11] = static_cast<double>(out.euler_accel[2]);
+		};
+		double k1[12], k2[12], tmp[12];
+		f(X, k1);
+
+		for (int i = 0; i < 12; i++) { tmp[i] = X[i] + dt * k1[i]; }
+
+		f(tmp, k2);
+
+		for (int i = 0; i < 12; i++) { X[i] += 0.5 * dt * (k1[i] + k2[i]); }
+
+		if (fabs(X[6]) > 1.5 || fabs(X[8]) > 1.5) { return 1e9; }
+
+		*max_tilt_deg = fmax(*max_tilt_deg, acos(fmin(1., cos(X[6]) * cos(X[8]))) * 180. / M_PI);
+
+		if (t > 5.) {
+			const double ex = X[0] + R * sin(w * t), ey = X[2] - R * (1. - cos(w * t));
+			sum_sq += ex * ex + ey * ey;
+			count++;
+		}
+	}
+
+	return sqrt(sum_sq / count);
+}
+
+} // namespace
+
+TEST(FlControlLaw, HeadingCompensationTracksWithRotatingHeading)
+{
+	double tilt_on = 0.;
+	double tilt_off = 0.;
+	const double rms_on = runWithRotatingHeading(true, &tilt_on);
+	const double rms_off = runWithRotatingHeading(false, &tilt_off);
+	// Reference level: the same circle with a fixed heading (the paper's frame is exact there)
+	double tilt_fixed = 0.;
+	const double rms_fixed = runWithRotatingHeading(false, &tilt_fixed, 0.);
+	EXPECT_LT(rms_on, 1.1 * rms_fixed);
+	EXPECT_LT(tilt_on, 15.);
+	EXPECT_GT(rms_off, 0.5); // without it the yaw ramp breaks the loop
+}

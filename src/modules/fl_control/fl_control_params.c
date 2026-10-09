@@ -44,6 +44,9 @@
  * slowly growing oscillation as soon as the vehicle has any lag. To restore them:
  *   K1 (x) = 1.452 3.509 2.41 2.9, K2 (y) = 1.26 2.5 2.26 2.5, K3 (z) = 1.6698 3.509 2.59 2.9, K4 = 0.5 1.5,
  * and FL_MODEL_DERIV 0 to also estimate the acceleration and jerk as the paper does.
+ * The yaw gains default to the study's second trajectory (poles 3 +- 3j): the first trajectory's (0.5, 1.5) leave a
+ * 6-11 deg yaw error on the 0.3 rad/s ramp, these 0.3 deg. Faster translation gains (poles -3, -4, -5, -6:
+ * K = 360 342 119 18 on x, y and z) track both trajectories of the study with 0.06-0.19 m RMS in Gazebo, see Tools/lab_fl/README.md.
  * Second trajectory of the study (Ts = 0.01 s): K1 = 0 49.375 6.25 7.9, K2 = 0 50 6.25 8, K3 = 0 58.32 7.29 8, K4 = 18 6.
  */
 
@@ -175,7 +178,7 @@ PARAM_DEFINE_FLOAT(FL_K34, 7.0f);
  * @decimal 4
  * @group FL Controller
  */
-PARAM_DEFINE_FLOAT(FL_K41, 0.5f);
+PARAM_DEFINE_FLOAT(FL_K41, 18.f);
 
 /**
  * FL gain k42 (yaw channel, yaw rate error)
@@ -185,7 +188,7 @@ PARAM_DEFINE_FLOAT(FL_K41, 0.5f);
  * @decimal 4
  * @group FL Controller
  */
-PARAM_DEFINE_FLOAT(FL_K42, 1.5f);
+PARAM_DEFINE_FLOAT(FL_K42, 6.f);
 
 /**
  * Derivative filter time constant

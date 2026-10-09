@@ -70,7 +70,7 @@ void TrajGenerator::latchParams()
 {
 	// Parameters are latched at trajectory start so that every run is reproducible
 	// and a parameter change in flight cannot create a jump in the reference.
-	_profile_params.type = static_cast<TrajectoryType>(math::constrain<int32_t>(_param_trj_type.get(), 0, 3));
+	_profile_params.type = static_cast<TrajectoryType>(math::constrain<int32_t>(_param_trj_type.get(), 0, 4));
 	_profile_params.amplitude = _param_trj_amp.get();
 	_profile_params.frequency = _param_trj_freq.get();
 	_profile_params.altitude = _param_trj_alt.get();

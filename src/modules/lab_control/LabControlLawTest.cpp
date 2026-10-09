@@ -306,3 +306,25 @@ TEST(LabControlLaw, ClosedLoopMatchesSimulinkModel)
 
 	EXPECT_EQ(next, sizeof(golden) / sizeof(golden[0]));
 }
+
+TEST(LabControlLaw, HeadingCompensationRotatesRollAndPitch)
+{
+	// Vehicle heading East (psi = 90 deg), reference 1 m ahead of it along East: it has to pitch forward, not roll
+	State s;
+	s.euler[2] = static_cast<float>(M_PI / 2.);
+	Reference now;
+	now.position[1] = 1.f;
+	now.yaw = s.euler[2];
+	Reference next = now;
+
+	const Output paper = compute(Gains(), kMass, kTs, kG, s, now, next, kNoTiltLimit);
+	EXPECT_GT(fabsf(paper.phi_ref), 0.05f); // as in the paper's frame: roll towards East while heading East
+	EXPECT_NEAR(paper.theta_ref, 0.f, 1e-4f);
+
+	Gains g;
+	g.heading_compensation = true;
+	const Output rotated = compute(g, kMass, kTs, kG, s, now, next, kNoTiltLimit);
+	EXPECT_NEAR(rotated.phi_ref, 0.f, 1e-4f);
+	EXPECT_LT(rotated.theta_ref, -0.05f); // nose down
+	EXPECT_NEAR(fabsf(rotated.theta_ref), fabsf(paper.phi_ref), 1e-3f);
+}
