@@ -133,6 +133,7 @@ void FlControl::Run()
 
 	if (!_common.readInputs(now, in)) {
 		// Mode active but inputs missing or stale: keep publishing a neutral setpoint until the safety logic leaves the mode
+		_common.checkSafety(now, nullptr, false);
 		_common.publishNeutral(now);
 		_last_input_failure = now;
 		return;
@@ -169,6 +170,7 @@ void FlControl::Run()
 	command.euler_accel = matrix::Vector3f(out.euler_accel);
 
 	const traj_control::Setpoints setpoints = _common.compute(in.euler, in.euler_rate, command);
+	_common.checkSafety(now, &in, !out.singular && PX4_ISFINITE(setpoints.thrust_norm) && setpoints.torque.isAllFinite());
 	_common.publishSetpoints(setpoints, now, in.timestamp_sample);
 
 	// FL has no explicit attitude reference: q_d is logged as NaN

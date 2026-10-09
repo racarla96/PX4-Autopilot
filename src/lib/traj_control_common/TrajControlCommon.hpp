@@ -55,6 +55,10 @@
 #include <uORB/topics/vehicle_thrust_setpoint.h>
 #include <uORB/topics/vehicle_torque_setpoint.h>
 
+#include <systemlib/mavlink_log.h>
+#include <uORB/topics/vehicle_command.h>
+
+#include "SafetyMonitor.hpp"
 #include "TrajControlMath.hpp"
 
 namespace traj_control
@@ -128,6 +132,14 @@ public:
 	 */
 	void publishNeutral(hrt_abstime timestamp);
 
+	/**
+	 * Safety checks (see SafetyMonitor.hpp), to be called once per controller sample while the mode is active. `in` is
+	 * nullptr when the inputs could not be read. When a check trips the operator is told through the MAVLink log and
+	 * Hold is requested from the commander (repeated every 0.5 s until the mode is left). Returns true once tripped.
+	 * The monitor is restarted by latchHoverThrust(), i.e. on every entry into the mode.
+	 */
+	bool checkSafety(hrt_abstime now, const Inputs *in, bool controller_ok);
+
 	/** Restart the per-run saturation counter (call on every entry into the mode). */
 	void resetSaturationCount() { _saturation_count = 0; }
 
@@ -145,6 +157,11 @@ private:
 	uint32_t _saturation_count{0};
 	bool _hover_latched{false};
 	float _hover_thrust_latched{0.5f};
+
+	SafetyMonitor _safety{};
+	hrt_abstime _last_hold_request{0};
+	orb_advert_t _mavlink_log_pub{nullptr};
+	uORB::Publication<vehicle_command_s> _command_pub{ORB_ID(vehicle_command)};
 
 	uORB::Subscription _hover_thrust_estimate_sub{ORB_ID(hover_thrust_estimate)};
 	uORB::Subscription _local_position_sub{ORB_ID(vehicle_local_position)};
@@ -170,6 +187,11 @@ private:
 		(ParamFloat<px4::params::TCC_TILT_MAX>) _param_tcc_tilt_max,
 		(ParamFloat<px4::params::TCC_TS>) _param_tcc_ts,
 		(ParamInt<px4::params::TCC_HDG_COMP>) _param_tcc_heading_frame,
+		(ParamFloat<px4::params::TCC_ERR_MAX>) _param_tcc_err_max,
+		(ParamFloat<px4::params::TCC_DIST_MAX>) _param_tcc_dist_max,
+		(ParamFloat<px4::params::TCC_ALT_MAX>) _param_tcc_alt_max,
+		(ParamFloat<px4::params::TCC_TILT_ABORT>) _param_tcc_tilt_abort,
+		(ParamFloat<px4::params::TCC_FAIL_TOUT>) _param_tcc_fail_tout,
 		(ParamFloat<px4::params::TCC_REF_TOUT>) _param_tcc_ref_tout,
 		(ParamFloat<px4::params::TCC_EST_TOUT>) _param_tcc_est_tout,
 		(ParamFloat<px4::params::MPC_THR_HOVER>) _param_mpc_thr_hover

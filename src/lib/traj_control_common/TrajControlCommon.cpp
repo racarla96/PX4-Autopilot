@@ -38,6 +38,7 @@
 #include "TrajControlCommon.hpp"
 
 #include <lib/mathlib/mathlib.h>
+#include <commander/px4_custom_mode.h>
 #include <px4_platform_common/defines.h>
 
 namespace traj_control
@@ -73,6 +74,8 @@ void TrajControlCommon::latchHoverThrust()
 				_param_mpc_thr_hover.get());
 	_hover_latched = true;
 	_model.hover_thrust = _hover_thrust_latched;
+	_safety.reset();
+	_last_hold_request = 0;
 }
 
 bool TrajControlCommon::readInputs(hrt_abstime now, Inputs &in)
@@ -122,6 +125,59 @@ bool TrajControlCommon::readInputs(hrt_abstime now, Inputs &in)
 
 	return PX4_ISFINITE(in.euler(0)) && PX4_ISFINITE(in.euler(1)) && PX4_ISFINITE(in.euler(2))
 	       && PX4_ISFINITE(in.position(0)) && PX4_ISFINITE(in.velocity(0)) && PX4_ISFINITE(in.ref_position(0));
+}
+
+bool TrajControlCommon::checkSafety(hrt_abstime now, const Inputs *in, bool controller_ok)
+{
+	SafetyLimits limits;
+	limits.error_max = _param_tcc_err_max.get();
+	limits.distance_max = _param_tcc_dist_max.get();
+	limits.altitude_max = _param_tcc_alt_max.get();
+	limits.tilt_abort = math::radians(_param_tcc_tilt_abort.get());
+	limits.input_timeout = _param_tcc_fail_tout.get();
+
+	SafetySample sample;
+	sample.inputs_ok = (in != nullptr);
+	sample.controller_ok = controller_ok;
+
+	if (in) {
+		for (int i = 0; i < 3; i++) {
+			sample.position[i] = in->position(i);
+		}
+
+		sample.error_norm = (in->ref_position - in->position).norm();
+		sample.tilt = acosf(math::constrain(cosf(in->euler(0)) * cosf(in->euler(1)), -1.f, 1.f));
+	}
+
+	const Trip before = _safety.trip();
+	const Trip trip = _safety.update(static_cast<float>(now) * 1e-6f, limits, sample);
+
+	if (trip == Trip::None) {
+		return false;
+	}
+
+	if (before == Trip::None) {
+		mavlink_log_critical(&_mavlink_log_pub, "Trajectory mode: %s, switching to Hold", tripText(trip));
+		PX4_WARN("safety trip: %s (tilt %.2f rad, error %.2f m, position %.1f %.1f %.1f)", tripText(trip), (double)sample.tilt,
+			 (double)sample.error_norm, (double)sample.position[0], (double)sample.position[1], (double)sample.position[2]);
+	}
+
+	if (now - _last_hold_request > 500000) {
+		_last_hold_request = now;
+		vehicle_command_s command{};
+		command.timestamp = now;
+		command.command = vehicle_command_s::VEHICLE_CMD_DO_SET_MODE;
+		command.param1 = 1.f;
+		command.param2 = PX4_CUSTOM_MAIN_MODE_AUTO;
+		command.param3 = PX4_CUSTOM_SUB_MODE_AUTO_LOITER;
+		command.target_system = 1;
+		command.target_component = 1;
+		command.source_system = 1;
+		command.source_component = 1;
+		_command_pub.publish(command);
+	}
+
+	return true;
 }
 
 void TrajControlCommon::publishSetpoints(const Setpoints &setpoints, hrt_abstime timestamp, hrt_abstime timestamp_sample)

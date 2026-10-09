@@ -76,7 +76,7 @@ start)
 	mkdir -p "$RT"
 	if [ "$backend" = gz ]; then
 		[ -x "$GZBUILD/bin/px4" ] || { echo "build the Gazebo SITL first (see the header of this script)" >&2; exit 1; }
-		rm -f "$RT/cmd" "$RT/px4.log"
+		rm -f "$RT/cmd" "$RT/px4.log" "$RT/parameters.bson" "$RT/parameters_backup.bson" # always start from the default parameters
 		mkfifo "$RT/cmd"
 		ln -sf "$GZBUILD/rootfs/gz_env.sh" "$RT/gz_env.sh"
 		# read-write open of the FIFO: it never sees EOF when a writer closes.

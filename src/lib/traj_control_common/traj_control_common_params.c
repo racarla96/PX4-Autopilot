@@ -236,3 +236,71 @@ PARAM_DEFINE_FLOAT(TCC_EST_TOUT, 0.2f);
  * @group Trajectory Control
  */
 PARAM_DEFINE_INT32(TCC_HDG_COMP, 1);
+
+/**
+ * Safety: maximum position error
+ *
+ * Leave the mode (to Hold) if the position error stays above this for 0.3 s. 0 disables the check.
+ *
+ * @unit m
+ * @min 0
+ * @max 50
+ * @decimal 1
+ * @group Trajectory Control
+ */
+PARAM_DEFINE_FLOAT(TCC_ERR_MAX, 3.f);
+
+/**
+ * Safety: maximum horizontal distance
+ *
+ * Leave the mode (to Hold) if the vehicle gets farther than this horizontally from the point where the mode was
+ * entered. Both trajectories of the study stay within 11 m. 0 disables the check.
+ *
+ * @unit m
+ * @min 0
+ * @max 500
+ * @decimal 1
+ * @group Trajectory Control
+ */
+PARAM_DEFINE_FLOAT(TCC_DIST_MAX, 20.f);
+
+/**
+ * Safety: maximum height
+ *
+ * Leave the mode (to Hold) if the vehicle climbs more than this above the point where the mode was entered. The
+ * second trajectory of the study climbs 5 m. 0 disables the check.
+ *
+ * @unit m
+ * @min 0
+ * @max 500
+ * @decimal 1
+ * @group Trajectory Control
+ */
+PARAM_DEFINE_FLOAT(TCC_ALT_MAX, 12.f);
+
+/**
+ * Safety: tilt abort angle
+ *
+ * Leave the mode (to Hold) if the tilt of the vehicle exceeds this angle. 0 disables the check.
+ *
+ * @unit deg
+ * @min 0
+ * @max 90
+ * @decimal 0
+ * @group Trajectory Control
+ */
+PARAM_DEFINE_FLOAT(TCC_TILT_ABORT, 70.f);
+
+/**
+ * Safety: input loss time
+ *
+ * Leave the mode (to Hold) if the state estimate or the reference are missing, stale or invalid for this long. In
+ * the meantime the vehicle receives a neutral setpoint (hover thrust, zero torque).
+ *
+ * @unit s
+ * @min 0.1
+ * @max 5
+ * @decimal 2
+ * @group Trajectory Control
+ */
+PARAM_DEFINE_FLOAT(TCC_FAIL_TOUT, 0.5f);

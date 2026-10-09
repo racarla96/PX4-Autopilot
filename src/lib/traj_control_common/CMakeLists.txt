@@ -34,6 +34,8 @@
 
 # Pure math, no uORB / parameter dependencies: linked by the unit test
 px4_add_library(traj_control_math
+	SafetyMonitor.cpp
+	SafetyMonitor.hpp
 	TrajControlMath.cpp
 	TrajControlMath.hpp
 )
@@ -48,3 +50,4 @@ target_link_libraries(traj_control_common PUBLIC traj_control_math)
 add_dependencies(traj_control_common prebuild_targets)
 
 px4_add_unit_gtest(SRC TrajControlMathTest.cpp LINKLIBS traj_control_math)
+px4_add_unit_gtest(SRC SafetyMonitorTest.cpp LINKLIBS traj_control_math)
