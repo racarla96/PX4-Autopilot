@@ -65,8 +65,8 @@ diverged on both trajectories.
   Defaults here are real poles at -1, -1.5, -2, -2.5.
 - `sitl.sh gains fl fast2` uses faster poles (-3..-6) with model derivatives. It gave the best results.
 - Paper gains with its trajectory 1 or 2 are still available as presets `paper1` and `paper2`.
-- The yaw loop uses `FL_K41 = 18`, `FL_K42 = 6` instead of 0.5 / 1.5. In Gazebo the slow paper yaw gains left a yaw error of
-  several degrees while the reference turns.
+- The yaw loop uses `FL_K41 = 18`, `FL_K42 = 6` instead of 0.5 / 1.5. These are faster, so the yaw follows the turning reference closely (0.3 to 1.5 degrees RMS in Gazebo). They were not
+  compared against the paper's yaw gains in isolation.
 
 Also `FL_EXACT_FZ`: the paper's Simulink model wires the `u_dot` terms of `fz` slightly differently from the exact
 derivative. Default 0 reproduces the paper; the effect is small.
@@ -123,8 +123,7 @@ the pilot procedure in `SAFETY.md`.
 | 2 | FL, `fast2` | 0.19 | 1.4 |
 
 Other configurations (measured): FL with the module defaults 0.34 m (trajectory 1) and 0.96 m (trajectory 2); FL with the
-paper gains and filtered derivatives diverges on both; LAB with the module defaults is in `plots/comparison/metrics.csv` and
-the other `.ulg` logs. The tilt stays between 9 and 20 degrees.
+paper gains and filtered derivatives diverges on both; LAB with the module defaults was also flown (logs `paper*_lab_robust.ulg`, not included in this repository). The tilt stays between 9 and 20 degrees.
 
 Caveats: one flight per configuration, one simulator, no wind or sensor-noise sweep. The gains were tuned by hand in
 Gazebo, so the comparison between LAB and FL reflects how much tuning each received as well as the controllers themselves.
