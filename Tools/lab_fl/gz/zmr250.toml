@@ -1,0 +1,98 @@
+# Lab drone: ZMR250 frame, 4 x JMT 1806 2280KV, 4045 propellers, 4S, Pixhawk 2.4.8.
+# Everything here is an input of make_model.py. Edit a mass or a position and run it again.
+# status: "measured" = weighed, "datasheet" = from a data sheet or a vendor value, "estimate" = guess to be replaced.
+# Body frame of the model: x forward, y left, z up, origin at the centre of the frame, z = 0 at the top face of the arms.
+
+[vehicle]
+name = "zmr250"
+# model height above the ground when spawned (bottom of the legs is at z = -0.0617)
+spawn_z = 0.065
+
+[motor]
+# 4 motors at (+-x, +-y), measured on the CAD of the frame (252 mm between opposite motors)
+x = 0.0783
+y = 0.0988
+base_z = 0.0            # base of the motor on the top face of the arm
+mass = 0.020            # kg each, with its cable (status: estimate, from the Simscape model)
+rotor_mass_fraction = 0.4   # share of the motor mass that spins (bell and shaft), added to the propeller
+height = 0.0265
+radius = 0.0119
+# bench data of the motor + propeller used by the model; identify_motor.py fits it
+bench_csv = "data/motor_1806_4045_4S.csv"
+pwm_min = 1030
+pwm_max = 1900
+time_constant = 0.030       # s, first order lag of the rotor speed (identified in the TFE)
+
+[propeller]
+diameter = 0.1016           # 4045, two blades
+mass = 0.0018               # kg each (measured)
+chord = 0.012
+thickness = 0.003
+z = 0.028                   # hub height above the arm top
+
+[legs]
+# one printed bar at the rear and one at the front (the STL is the rear one); ASA, 50 % infill
+density_asa = 1070          # kg/m3
+infill_factor = 0.5         # share of the solid volume that is plastic (walls make the real value a bit higher)
+count = 2
+
+# Every other body of the vehicle. kind box: size = [x, y, z] metres, pose = centre. kind mesh: the mass is spread over the
+# volume of the mesh. kind points: list of [x, y, z] masses.
+[[body]]
+name = "frame"
+kind = "mesh"
+mesh = "frame.stl"
+mass = 0.142                # kg, ZMR250 with screws and aluminium spacers (status: datasheet 140-145 g)
+status = "datasheet"
+
+[[body]]
+name = "pixhawk"
+kind = "box"
+size = [0.0816, 0.052, 0.016]
+pose = [0.0, 0.0, 0.0187]   # centred between the plates, where the lab drone has no central spacers (the CAD still has them)
+mass = 0.039
+status = "datasheet"
+
+[[body]]
+name = "battery"
+kind = "box"
+size = [0.106, 0.036, 0.033]     # Tattu 2300 mAh 4S
+pose = [0.0, 0.0, -0.021]        # under the frame, between the legs, centred (position: assumption, to be confirmed)
+mass = 0.250
+status = "datasheet"
+
+[[body]]
+name = "esc"
+kind = "points"
+points = [[0.050, 0.060, 0.003], [0.050, -0.060, 0.003], [-0.050, 0.060, 0.003], [-0.050, -0.060, 0.003]]
+mass = 0.020
+status = "estimate"
+
+[[body]]
+name = "wiring"
+kind = "box"
+size = [0.06, 0.04, 0.01]
+pose = [0.0, 0.0, 0.010]    # power distribution, XT60, receiver
+mass = 0.028
+status = "estimate"
+
+[[body]]
+name = "beacon"
+kind = "box"                     # mass properties: the 55 x 55 x 32 mm housing; the antenna is not counted
+size = [0.055, 0.055, 0.032]
+pose = [0.0, 0.0, 0.0541]        # on the top plate (top face at z = 38.1 mm), centred
+mass = 0.057                     # Marvelmind Super-Beacon, vendor value
+status = "datasheet"
+visual_mesh = "beacon.stl"       # CAD of the vendor (convert_beacon.py), bottom face at z = 0, antenna up
+visual_pose = [0.0, 0.0, 0.0381]
+
+[camera]
+# chase camera for videos, fixed to the vehicle (looks at it from behind and above). Off by default: enable it with
+# make_model.py --set camera.enabled=true (videos/make_video.sh does it).
+enabled = false
+x = -0.70
+z = 0.30
+pitch = 0.30
+fov = 1.2
+width = 960
+height = 540

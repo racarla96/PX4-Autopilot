@@ -15,7 +15,9 @@ gains=${3:?}
 extra=${4:-}
 case "$traj" in paper) dur=80 ;; paper2) dur=35 ;; *) dur=60 ;; esac
 
-mkdir -p "$RT/runs"
+RUNS="$RT/runs"
+[ "${VEHICLE:-x500}" = x500 ] || RUNS="$RT/runs/$VEHICLE"
+mkdir -p "$RUNS"
 newest() { find "$ROOT/build/px4_sitl_default_gz/rootfs/log" "$RT/log" -name '*.ulg' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2; }
 
 "$HERE/sitl.sh" start gz "$traj"
@@ -34,5 +36,5 @@ sleep 15
 "$HERE/sitl.sh" stop
 sleep 3
 src=$(newest)
-cp "$src" "$RT/runs/${traj}_${ctrl}_${gains}.ulg"
-echo "log: $RT/runs/${traj}_${ctrl}_${gains}.ulg"
+cp "$src" "$RUNS/${traj}_${ctrl}_${gains}.ulg"
+echo "log: $RUNS/${traj}_${ctrl}_${gains}.ulg"

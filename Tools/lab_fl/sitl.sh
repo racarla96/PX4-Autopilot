@@ -2,6 +2,7 @@
 # SITL helper for the LAB and FL flight modes.
 #
 #   sitl.sh start [sih|gz] [circle|paper|paper2]   start PX4 SITL and apply the vehicle calibration
+#                                           VEHICLE=zmr250 sitl.sh start gz ...: the lab drone (Tools/lab_fl/gz) instead of the x500
 #                                           sih: SIH quadrotor, headless, in Docker (default)
 #                                           gz:  Gazebo x500 with the 3D window, on the host (spawned facing north)
 #                                           trajectory: circle (yaw constant, default), paper (first trajectory of the
@@ -24,6 +25,7 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+VEHICLE=${VEHICLE:-x500}
 RT=${PX4_SITL_RT:-$HOME/px4_sitl_labfl}
 NAME=px4_labfl
 JOY=px4_labfl_joy
@@ -58,9 +60,9 @@ stop_all() {
 }
 
 calibration() {
-	# model of the vehicle (see the TCC_* parameter documentation)
+	# model of the vehicle (see the TCC_* parameter documentation). The lab drone brings its own values in its airframe.
 	case "$1" in
-	gz) set -- "TCC_MASS 2.06" "TCC_IXX 0.0236" "TCC_IYY 0.0236" "TCC_IZZ 0.0439" "TCC_TQ_MAX_XY 3.14" "TCC_TQ_MAX_Z 0.52" ;;
+	gz) [ "$VEHICLE" = zmr250 ] && set -- || set -- "TCC_MASS 2.06" "TCC_IXX 0.0236" "TCC_IYY 0.0236" "TCC_IZZ 0.0439" "TCC_TQ_MAX_XY 3.14" "TCC_TQ_MAX_Z 0.52" ;;
 	*) set -- "TCC_MASS 1.0" "TCC_IXX 0.025" "TCC_IYY 0.025" "TCC_IZZ 0.03" "TCC_TQ_MAX_XY 2.83" "TCC_TQ_MAX_Z 0.4" ;;
 	esac
 	# no data link loss action: the preflight checks must not depend on a ground station being connected
@@ -84,9 +86,21 @@ start)
 		# setsid makes PX4 the leader of its process group, so `stop` can kill PX4 and the Gazebo processes it starts.
 		# The x500 of Gazebo spawns facing east (heading 90 deg). The LAB and FL laws assume the vehicle faces north, so spawn it
 		# facing north unless the caller sets PX4_GZ_MODEL_POSE ("x,y,z,roll,pitch,yaw" in the ENU world frame, yaw pi/2 = north).
-		export PX4_GZ_MODEL_POSE=${PX4_GZ_MODEL_POSE:-0,0,0.1,0,0,1.5708}
+		case "$VEHICLE" in
+		zmr250)
+			# the Gazebo spawn reads ${PX4_GZ_MODELS}/<model>/model.sdf: link the generated model of the lab drone there
+			ln -sfn "$ROOT/Tools/lab_fl/gz/models/zmr250" "$ROOT/Tools/simulation/gz/models/zmr250"
+			# the models directory is a git submodule: keep the link out of its status
+			excl=$(git -C "$ROOT/Tools/simulation/gz" rev-parse --git-path info/exclude 2>/dev/null || true)
+			if [ -n "$excl" ]; then
+				case "$excl" in /*) ;; *) excl="$ROOT/Tools/simulation/gz/$excl" ;; esac
+				grep -qx "models/zmr250" "$excl" 2>/dev/null || echo "models/zmr250" >> "$excl"
+			fi
+			export PX4_GZ_MODEL_POSE=${PX4_GZ_MODEL_POSE:-0,0,0.07,0,0,1.5708} ;;
+		*) export PX4_GZ_MODEL_POSE=${PX4_GZ_MODEL_POSE:-0,0,0.1,0,0,1.5708} ;;
+		esac
 		(cd "$RT"
-			GZ_IP=127.0.0.1 PX4_SIM_MODEL=gz_x500 setsid nohup "$GZBUILD/bin/px4" <> "$RT/cmd" > "$RT/px4.log" 2>&1 &
+			GZ_IP=127.0.0.1 PX4_SIM_MODEL=gz_$VEHICLE setsid nohup "$GZBUILD/bin/px4" <> "$RT/cmd" > "$RT/px4.log" 2>&1 &
 			echo $! > "$RT/px4.pid")
 		if [ "${JOYSTICK:-1}" = "1" ]; then
 			docker run -d --rm --name "$JOY" --network host -v "$ROOT/Tools/lab_fl":/harness "$IMAGE" python3 /harness/mc_send.py >/dev/null
