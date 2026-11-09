@@ -73,8 +73,10 @@ to Hold. One flight per cell.
 | 30 ms | left the mode after 0.6 s | 0.203 m, yaw 2.1 deg |
 | 50 ms | left the mode after 0.5 s | 0.198 m, yaw 2.1 deg |
 
-- **FL does not depend on the rotor lag** in this range. It saturates the thrust 18 % of the time (thrust-to-weight is only
-  about 1.4) and tilts up to 19 degrees.
+- **FL does not depend on the rotor lag** in this range. Its saturation flag is up about 18 % of the time, but that is the
+  limit on the commanded angular acceleration (`TCC_ALPHA_XY/Z`, the paper's +-10 and +-1 rad/s^2), not the thrust: the thrust
+  never saturated. The peak thrust demand is 0.88 of the maximum against a limit (`TCC_THR_MAX`) of 0.90 (637 g model), so the
+  margin is thin: a lower battery voltage would saturate it. Tilt up to 19 degrees.
 - **LAB with the gains of the paper only works with a lag of about 12 ms or less.** Those gains are an almost deadbeat design
   for an ideal torque actuator. LAB with the module's default gains (`lab robust`, 30 ms) also fails: it left the mode after
   11.8 s (0.91 m RMSE). LAB needs gains designed for the real lag before it flies this drone: an open task.

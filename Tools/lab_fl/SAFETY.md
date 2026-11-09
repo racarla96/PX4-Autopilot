@@ -28,8 +28,9 @@ Verified in SITL: stopping the manual control source while in LAB makes the comm
 - Keep a mode switch on the transmitter for Hold / Position at all times: any other mode can be selected from any mode,
   and the modes are left at once.
 - LAB and FL can be selected one after the other; each entry restarts the trajectory from the current position and heading.
-- First flights: tethered or on the gimbal rig without propellers, then with propellers at a low `TRJ_AMP`, then the
-  trajectories of the study (the second reaches 4.4 m/s and 1.4 rad/s of yaw: scale it up in steps).
+- First flights: tethered or on the gimbal rig without propellers, then with propellers on the circle at a small `TRJ_AMP`
+  and a low `TRJ_FREQ` (they only change the circle, type 1), then the trajectories of the study. Those are fixed (the second
+  reaches 4.4 m/s and 1.4 rad/s of yaw) and have no scale parameter yet: add a time stretch before flying them for real.
 
 ## Verified in Gazebo SITL (x500)
 Reference lost (`traj_generator stop`) -> Hold; position error limit -> Hold; distance limit -> Hold; manual Hold; Hold -> FL;
