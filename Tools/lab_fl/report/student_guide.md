@@ -106,28 +106,25 @@ QGroundControl connects by itself (UDP 14550). The simulator has no radio, so `s
 
 **Step 8. Reproduce section 4.** Fly the four best configurations and compare your numbers with the table. Differences of a few percent are normal (one flight per configuration).
 
-**Step 9. Review the implementation and make sure you understand it.** The code is compact: about 2,200 lines of C++ in nine source files (3,300 with the headers), plus about 3,500 lines of unit tests. Read it next to the paper and the original MATLAB (`controllers/LAB_controller.m` and `FL_controller.m` in the paper repository, and the thesis `docs/memoria.pdf`), in the order of the table. Using an AI assistant to go through it step by step is recommended, but check each explanation against the paper and the MATLAB: an assistant can be wrong.
+**Step 9. Review the controller implementation and make sure you understand it.** Only the part that implements the controllers, not the whole code: the two laws, `LabControlLaw.*` and `FlControlLaw.*`. They are pure functions (no PX4 inside), about 400 lines of C++ (650 with the headers). Read them next to the paper and the original MATLAB (`controllers/LAB_controller.m` and `FL_controller.m` in the paper repository, and the thesis `docs/memoria.pdf`). Using an AI assistant to go through them step by step is recommended, but check each explanation against the paper and the MATLAB: an assistant can be wrong.
 
-| # | File | What to understand |
+| Order | File | What to understand |
 |---|---|---|
-| 1 | `src/lib/traj_control_common/TrajControlMath.*` | frames (the paper's x north, y east, z up against PX4's NED), Euler angles and rates, conversion of the law's output to normalized thrust and torque, limits |
-| 2 | `src/modules/lab_control/LabControlLaw.*` | the LAB law (a pure function), the gains k1 to k12, the heading compensation |
-| 3 | `src/modules/fl_control/FlControlLaw.*` | the FL law, the dynamic extension, derivatives from the model, the heading terms |
-| 4 | `src/modules/traj_generator/TrajectoryProfile.*`, `TrajGenerator.cpp` | the reference: circle, paper 1, paper 2 (septic minimum-snap), start from the current position and heading |
-| 5 | `src/lib/traj_control_common/TrajControlCommon.*`, `LabControl.cpp`, `FlControl.cpp` | the PX4 side: uORB inputs, hover thrust latch, fixed sample time, publishing thrust and torque, safety hooks |
-| 6 | `src/lib/traj_control_common/SafetyMonitor.*` | when the mode leaves to Hold |
-| 7 | the `*Test.cpp` files | the laws and the monitor are unit-tested: read the tests as examples of the intended behaviour |
+| 1 | `src/modules/lab_control/LabControlLaw.*` | the LAB law: gains k1 to k12, the use of the reference at samples i and i+1, the heading compensation |
+| 2 | `src/modules/fl_control/FlControlLaw.*` | the FL law: dynamic extension, derivatives from the model, pole-placement gains, the heading terms |
+| 3 | `LabControlLawTest.cpp`, `FlControlLawTest.cpp` | the tests of each law: examples of the intended behaviour |
+| context | `src/lib/traj_control_common/TrajControlMath.*`, and where `LabControl.cpp` and `FlControl.cpp` call the law | only to know what goes into the law (frames of the paper against PX4's NED, units) and what comes out (angular acceleration converted to normalized thrust and torque). No need to review them line by line. |
+
+Not part of this review: the trajectory generator, the safety monitor and the PX4 plumbing. Skim them if you are curious.
 
 Questions to check your understanding:
 
-- Where does the paper's model differ from the real vehicle, and what does the code do about it? Why is the *measured* heading used?
+- Where does the paper's model differ from the real vehicle, and what does the law do about it? Why is the *measured* heading used?
 - Why does FL take the acceleration and jerk from the model instead of filtering the velocity?
 - What does the sample time `TCC_TS` change, and why do the LAB gains depend on it?
-- How are thrust and torque normalized (`TCC_TQ_MAX_XY/Z`), and what happens if the inertia or the torque scale is wrong?
-- What does "torque saturated" mean in a log?
-- Which checks send the vehicle to Hold, and which PX4 failsafes still apply?
+- What are the inputs and outputs of each law, and in which frame and units?
 
-**Deliverable of this step:** a short note (one or two pages) that maps each equation of the paper to the function that implements it, and lists anything that looks wrong, unclear or different from the paper. Reviewing means looking for bugs too: report what you find.
+**Deliverable of this step:** a short note (one or two pages) that maps each equation of the paper to the line or function that implements it, in LAB and in FL, and lists anything that looks wrong, unclear or different from the paper. Reviewing means looking for bugs too: report what you find.
 
 # 4. What has been found (Gazebo, x500)
 
@@ -205,7 +202,7 @@ Open points to measure on the bench: which NMEA sentences the beacon sends (the 
 
 | # | Task | Done when |
 |---|---|---|
-| 0 | Run the simulation (section 3) and **review and understand the implementation** (step 9). | The note of step 9, and your simulation results next to the tables of this guide |
+| 0 | Run the simulation (section 3) and **review and understand the controller implementation** (step 9: the two laws only). | The note of step 9, and your simulation results next to the tables of this guide |
 | 1 | Confirm the hardware with the supervisor (section 5.3). Get the real weight of each part and a CAD of the frame (or accept a simple geometry). | A list of parts with weights |
 | 2 | Bench-test the motor and propeller (8045 on the MT2213, 4S): thrust, torque, current and rpm against PWM, RCbenchmark format. | A CSV like `data/motor_1806_4045_4S.csv` |
 | 3 | Measure the **rotor speed lag** with a PWM step at the bench. | A time constant in ms (up and down) |
