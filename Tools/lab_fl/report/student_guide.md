@@ -25,6 +25,25 @@ Everything is in one repository: `https://github.com/racarla96/PX4-Autopilot`, b
 | Marvelmind indoor positioning | **Studied, not tested.** Plan in section 6. |
 | Anything on real hardware | **Not done.** All results so far are simulation. |
 
+## 1.2 The test space: 3 m of ceiling
+
+The first tests are in a room with **at most 3 m of height** (the horizontal size still has to be written down here). This changes several things:
+
+- **The paper's trajectories do not fit at full size.** The second one rises 5 m above the hover point (7.5 m with the default take-off altitude of 2.5 m) and moves 5 m and 10 m horizontally. They are fixed in the code today, so a **length scale parameter** for them is needed before any flight in the room (task 10).
+- **Scaled numbers** (second trajectory, each move lasts 5 s, so the speed and acceleration scale with the length):
+
+| Length scale | Moves (z, x, y) | Peak speed | Peak acceleration | Highest point above hover |
+|---|---|---|---|---|
+| 1.0 (as in the paper) | 5, 5, 10 m | 4.4 m/s | 3.0 m/s^2 | 5 m |
+| 0.3 | 1.5, 1.5, 3 m | 1.3 m/s | 0.9 m/s^2 | 1.5 m |
+| 0.2 | 1.0, 1.0, 2 m | 0.9 m/s | 0.6 m/s^2 | 1.0 m |
+
+  With a hover at 1 m, the scale 0.2 peaks at 2 m and the scale 0.3 at 2.5 m (0.5 m below the ceiling, where the stationary beacons will be). Start with 0.2. The yaw moves (pi and back) are not affected by the length scale.
+- **Take-off altitude:** lower `MIS_TAKEOFF_ALT` (default 2.5 m) to about 1 m, because the trajectory starts from the hover height.
+- **Safety limits for the room** (suggested, adjust to the real size): `TCC_ALT_MAX` about 1.5 m (it is relative to the entry point), `TCC_DIST_MAX` about half of the room, `TCC_ERR_MAX` 0.5 to 1 m. The defaults (12 m, 20 m, 3 m) are meant for open space.
+- **The distance sensor becomes useful all along the flight** (task 11): a VL53L0X reaches about 2 m, which covers most of the flight volume. In addition, the Marvelmind manual says that close to the ground X and Y are fine but Z is not (trilateration geometry), so a distance sensor complements it exactly where it is weakest.
+- Propellers near the floor and the ceiling: watch for ground and ceiling effect on the first hovers.
+
 # 2. Repository map
 
 | What | Where |
@@ -172,15 +191,15 @@ Open points to measure on the bench: which NMEA sentences the beacon sends (the 
 | 7 | Marvelmind: bench capture of the NMEA stream, then a flight in Position mode with it. | The EKF fuses the position without rejections in the log |
 | 8 | Hardware tests: rig without propellers, then with propellers on a rig, then a hover, then free flight in Position, then LAB and FL on the circle at a small `TRJ_AMP` and a low `TRJ_FREQ`, then the paper's trajectories (task 10 first). | Logs of each stage |
 | 9 | Compare LAB and FL on the real drone with `analyze.py`. | The report |
-| 10 | **Software, before task 8's last stage:** add a time-scale parameter to the paper trajectories in `traj_generator` (see recommendation 4). | First flights at a slow pace |
-| 11 | **Pending, low priority:** a VL53L0X distance sensor facing down (I2C) for take-off and landing and as a complementary height measurement. The driver is already in the `fmu-v3` firmware (no extra flash). Use the conditional mode `EKF2_RNG_CTRL = 1` (range used only at low speed and low altitude). Its range is about 2 m (check the data sheet), so it cannot help in the upper part of the trajectories. Not in the simulation model yet. | Height from the sensor below its range, in the log |
+| 10 | **Software, before any flight in the room:** add a **length scale** parameter to the paper trajectories in `traj_generator` (and optionally a time stretch), see section 1.2 and recommendation 4. Add unit tests. | The second trajectory flies at scale 0.2 in simulation |
+| 11 | **Pending:** a VL53L0X distance sensor facing down (I2C) for take-off and landing and as a complementary height measurement. The driver is already in the `fmu-v3` firmware (no extra flash). Start with the conditional mode `EKF2_RNG_CTRL = 1` (range used only at low speed and low altitude) and consider always-on if the flights stay below its range (about 2 m, check the data sheet; it is shorter in bright light). Not in the simulation model yet. | Height from the sensor in the log, and no rejections of it by the EKF |
 
 # 8. Recommendations
 
 1. **One change at a time, and a log of each flight.** Run `analyze.py` after every flight and keep the `.ulg` with a name that says what it is.
 2. **Never trust an estimate that has not been measured.** The lag, the thrust at low battery and the inertia are the three that decide the result. `zmr250.toml` marks each mass as measured, datasheet or estimate: keep that honest.
 3. **Thrust falls with the battery voltage.** The bench ran at 16.8 to 15.9 V. Always check the margin at the lowest voltage you will fly.
-4. **The paper trajectories are violent and fixed** (the second reaches 4.4 m/s and 1.4 rad/s of yaw). `TRJ_AMP` and `TRJ_FREQ` only change the circle (type 1): the paper trajectories have no scale parameter yet. Add one (a time stretch: acceleration falls with the square of the duration) before the first real flights, and meanwhile use the circle at a small amplitude.
+4. **The paper trajectories are fixed and do not fit the room** (the second reaches 4.4 m/s, rises 5 m and turns 1.4 rad/s of yaw). `TRJ_AMP` and `TRJ_FREQ` only change the circle (type 1): the paper trajectories have no scale parameter yet. Add a length scale (section 1.2) before the first real flights, and meanwhile use the circle at a small amplitude.
 5. **First flights without propellers, then tethered.** Keep a mode switch for Hold on the transmitter at all times.
 6. **Flash is almost full** (98.68 %). Check the size after every firmware change.
 7. **Set up the simulator with default parameters.** `sitl.sh start gz` already deletes the saved parameters, so each run starts clean.

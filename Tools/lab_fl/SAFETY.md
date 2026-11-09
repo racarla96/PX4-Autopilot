@@ -29,7 +29,7 @@ Verified in SITL: stopping the manual control source while in LAB makes the comm
   and the modes are left at once.
 - LAB and FL can be selected one after the other; each entry restarts the trajectory from the current position and heading.
 - First flights: tethered or on the gimbal rig without propellers, then with propellers on the circle at a small `TRJ_AMP`
-  and a low `TRJ_FREQ` (they only change the circle, type 1), then the trajectories of the study. Those are fixed (the second
+  and a low `TRJ_FREQ` (they only change the circle, type 1), then the trajectories of the study (they do not fit a room with 3 m of ceiling at full size). Those are fixed (the second
   reaches 4.4 m/s and 1.4 rad/s of yaw) and have no scale parameter yet: add a time stretch before flying them for real.
 
 ## Verified in Gazebo SITL (x500)
