@@ -106,7 +106,7 @@ QGroundControl connects by itself (UDP 14550). The simulator has no radio, so `s
 
 **Step 8. Reproduce section 4.** Fly the four best configurations and compare your numbers with the table. Differences of a few percent are normal (one flight per configuration).
 
-**Step 9. Read the implementation and make sure you understand it.** It is deliberately small: about 1,400 lines in six files. Read it with the paper and the original MATLAB next to it (`controllers/LAB_controller.m` and `FL_controller.m` in the paper repository, and the thesis `docs/memoria.pdf`), in this order:
+**Step 9. Review the implementation and make sure you understand it.** The code is compact: about 2,200 lines of C++ in nine source files (3,300 with the headers), plus about 3,500 lines of unit tests. Read it next to the paper and the original MATLAB (`controllers/LAB_controller.m` and `FL_controller.m` in the paper repository, and the thesis `docs/memoria.pdf`), in the order of the table. Using an AI assistant to go through it step by step is recommended, but check each explanation against the paper and the MATLAB: an assistant can be wrong.
 
 | # | File | What to understand |
 |---|---|---|
