@@ -173,6 +173,7 @@ Open points to measure on the bench: which NMEA sentences the beacon sends (the 
 | 8 | Hardware tests: rig without propellers, then with propellers on a rig, then a hover, then free flight in Position, then LAB and FL on the circle at a small `TRJ_AMP` and a low `TRJ_FREQ`, then the paper's trajectories (task 10 first). | Logs of each stage |
 | 9 | Compare LAB and FL on the real drone with `analyze.py`. | The report |
 | 10 | **Software, before task 8's last stage:** add a time-scale parameter to the paper trajectories in `traj_generator` (see recommendation 4). | First flights at a slow pace |
+| 11 | **Pending, low priority:** a VL53L0X distance sensor facing down (I2C) for take-off and landing and as a complementary height measurement. The driver is already in the `fmu-v3` firmware (no extra flash). Use the conditional mode `EKF2_RNG_CTRL = 1` (range used only at low speed and low altitude). Its range is about 2 m (check the data sheet), so it cannot help in the upper part of the trajectories. Not in the simulation model yet. | Height from the sensor below its range, in the log |
 
 # 8. Recommendations
 
